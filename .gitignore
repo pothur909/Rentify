@@ -16,10 +16,24 @@
 
 # next.js
 /.next/
+**/.next/
 /out/
+
+frontend/.next
+
+# → Node backend build folders
+backend/dist/
+backend/build/
+
+# → Environment files
+.env*
+backend/.env
+frontend/.env
+
 
 # production
 /build
+
 
 # misc
 .DS_Store
