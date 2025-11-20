@@ -1,0 +1,6 @@
+{
+  "version": 3,
+  "sources": [],
+  "sections": [
+    {"offset": {"line": 21, "column": 0}, "map": {"version":3,"sources":["file:///D:/Quaantisc/Rentify/frontend/app/dashboard/packages/page.tsx"],"sourcesContent":["// export default function PackagesPage() {\r\n//   const packages = [\r\n//     { name: \"Basic Lead Pack\", leads: 30 },\r\n//     { name: \"Pro Lead Pack\", leads: 60 },\r\n//   ];\r\n\r\n//   return (\r\n//     <div className=\"text-black\">\r\n//       <h1 className=\"text-2xl font-bold mb-4 \">Packages</h1>\r\n//       <div className=\"grid grid-cols-1 md:grid-cols-2 gap-4\">\r\n//         {packages.map((pkg) => (\r\n//           <div key={pkg.name} className=\"p-4 bg-white rounded shadow\">\r\n//             <h2 className=\"font-semibold\">{pkg.name}</h2>\r\n//             <p>{pkg.leads} leads included</p>\r\n//           </div>\r\n//         ))}\r\n//       </div>\r\n//     </div>\r\n//   );\r\n// }\r\n"],"names":[],"mappings":"AAAA,2CAA2C;AAC3C,uBAAuB;AACvB,8CAA8C;AAC9C,4CAA4C;AAC5C,OAAO;AAEP,aAAa;AACb,mCAAmC;AACnC,+DAA+D;AAC/D,gEAAgE;AAChE,mCAAmC;AACnC,yEAAyE;AACzE,4DAA4D;AAC5D,gDAAgD;AAChD,mBAAmB;AACnB,cAAc;AACd,eAAe;AACf,aAAa;AACb,OAAO;AACP,IAAI"}}]
+}
