@@ -1,0 +1,18 @@
+const mongoose = require('mongoose');
+
+const LeadSchema = new mongoose.Schema(
+  {
+    name: { type: String, required: true, trim: true },
+    phoneNumber: { type: String, required: true, trim: true },
+    address: { type: String, required: false, trim: true },
+    budget: { type: Number, required: false },
+    flatType: { type: String, required: false, trim: true },
+    status: { type: String, enum: ['open', 'assigned', 'closed'], default: 'open' },
+    areaKey: { type: String, trim: true },
+    assignedTo: { type: mongoose.Schema.Types.ObjectId, ref: 'Broker' },
+    assignedAt: { type: Date },
+  },
+  { timestamps: true }
+);
+
+module.exports = mongoose.model('Lead', LeadSchema);
