@@ -12,6 +12,7 @@ var usersRouter = require('./routes/users');
 var leadsRouter = require('./routes/leads');
 var brokersRouter = require('./routes/brokers');
 var packagesRouter = require('./routes/packages');
+const cors = require('cors');
 
 var app = express();
 
@@ -24,6 +25,27 @@ app.use(express.json());
 app.use(express.urlencoded({ extended: false }));
 app.use(cookieParser());
 app.use(express.static(path.join(__dirname, 'public')));
+
+// Robust CORS setup (like your second project)
+const corsOptions = {
+  origin: (origin, callback) => {
+    if (!origin) return callback(null, true); // allow curl/Postman/no-origin
+    return callback(null, origin); // allow browser origin
+  },
+  credentials: true,
+  methods: ['GET', 'POST', 'PUT', 'PATCH', 'DELETE', 'OPTIONS'],
+  allowedHeaders: [
+    'Content-Type',
+    'Authorization',
+    'X-Requested-With',
+    'Accept',
+    'Origin',
+    'Idempotency-Key',
+    'x-fingerprint',
+    'X-Fingerprint',
+  ],
+};
+app.use(cors(corsOptions));
 
 // MongoDB connection (update URI as needed)
 mongoose

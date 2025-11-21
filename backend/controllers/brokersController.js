@@ -1,6 +1,8 @@
 const Broker = require('../models/Broker');
 const Lead = require('../models/Lead');
 const Package = require('../models/Package');
+const jwt = require('jsonwebtoken');
+const JWT_SECRET = process.env.JWT_SECRET || "secret";
 
 exports.signup = async (req, res, next) => {
   try {
@@ -55,34 +57,90 @@ exports.requestOtp = async (req, res, next) => {
   }
 };
 
-exports.verifyOtp = async (req, res, next) => {
+// exports.verifyOtp = async (req, res, next) => {
+//   try {
+//     const { phoneNumber, otp } = req.body;
+//     if (!phoneNumber || !otp) {
+//       return res.status(400).json({ message: 'phoneNumber and otp are required' });
+//     }
+
+//     const broker = await Broker.findOne({ phoneNumber });
+//     if (!broker || !broker.otpCode || !broker.otpExpires) {
+//       return res.status(400).json({ message: 'OTP not requested or invalid' });
+//     }
+
+//     if (broker.otpExpires < new Date()) {
+//       return res.status(400).json({ message: 'OTP expired' });
+//     }
+
+//     if (broker.otpCode !== otp) {
+//       return res.status(400).json({ message: 'Invalid OTP' });
+//     }
+
+//     // Clear OTP after successful verification
+//     broker.otpCode = undefined;
+//     broker.otpExpires = undefined;
+//     await broker.save();
+
+//     return res.json({ message: 'Login successful' });
+//   } catch (err) {
+//     next(err);
+//   }
+// };
+
+
+// Request OTP for signup
+
+ // replace with your secret
+
+exports.verifyOtp = async (req, res) => {
   try {
     const { phoneNumber, otp } = req.body;
+
     if (!phoneNumber || !otp) {
-      return res.status(400).json({ message: 'phoneNumber and otp are required' });
+      return res.status(400).json({ success: false, message: "Phone number and OTP are required" });
     }
 
-    const broker = await Broker.findOne({ phoneNumber });
+    // Ensure +91 prefix
+    const formattedPhone = phoneNumber.startsWith("+") ? phoneNumber : `+91${phoneNumber}`;
+
+    const broker = await Broker.findOne({ phoneNumber: formattedPhone });
     if (!broker || !broker.otpCode || !broker.otpExpires) {
-      return res.status(400).json({ message: 'OTP not requested or invalid' });
+      return res.status(400).json({ success: false, message: "OTP not requested or invalid" });
     }
 
     if (broker.otpExpires < new Date()) {
-      return res.status(400).json({ message: 'OTP expired' });
+      return res.status(400).json({ success: false, message: "OTP expired" });
     }
 
     if (broker.otpCode !== otp) {
-      return res.status(400).json({ message: 'Invalid OTP' });
+      return res.status(400).json({ success: false, message: "Invalid OTP" });
     }
 
-    // Clear OTP after successful verification
+    // Clear OTP
     broker.otpCode = undefined;
     broker.otpExpires = undefined;
     await broker.save();
 
-    return res.json({ message: 'Login successful' });
+    // Generate JWT
+    const token = jwt.sign({ brokerId: broker._id }, JWT_SECRET, { expiresIn: "7d" });
+
+    return res.status(200).json({
+      success: true,
+      message: "Login successful",
+      token,
+      broker: {
+        _id: broker._id,
+        name: broker.name,
+        phoneNumber: broker.phoneNumber,
+        serviceAreas: broker.serviceAreas,
+        availableFlatTypes: broker.availableFlatTypes,
+        address: broker.address
+      }
+    });
   } catch (err) {
-    next(err);
+    console.error("Error verifying OTP:", err);
+    return res.status(500).json({ success: false, message: "Server error", error: err.message });
   }
 };
 
