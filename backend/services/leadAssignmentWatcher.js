@@ -10,15 +10,34 @@ async function assignLeadIfPossible(leadDoc) {
   const address = leadDoc.address || '';
   const addrLower = address.toLowerCase();
 
-  const brokers = await Broker.find({ serviceAreas: { $exists: true, $ne: [] } }).lean();
+  // Get brokers with service areas and populate their packages
+  const brokers = await Broker.find({ serviceAreas: { $exists: true, $ne: [] } })
+    .populate('currentPackage')
+    .lean();
+  
+  // Filter brokers by service area match
   const matchedBrokers = brokers.filter((b) => (b.serviceAreas || []).some((a) => addrLower.includes(String(a).toLowerCase())));
 
   if (!matchedBrokers.length) return; // no match, leave open
 
-  const areas = matchedBrokers.flatMap((b) => b.serviceAreas || []);
+  // Filter brokers who have active packages with remaining leads
+  const eligibleBrokers = matchedBrokers.filter((b) => {
+    // Must have a current package
+    if (!b.currentPackage) return false;
+    
+    // Must have remaining leads (leadsAssigned < leadLimit)
+    const leadsAssigned = b.leadsAssigned || 0;
+    const leadLimit = b.currentPackage.leadLimit || 0;
+    
+    return leadsAssigned < leadLimit;
+  });
+
+  if (!eligibleBrokers.length) return; // no eligible brokers with package capacity
+
+  const areas = eligibleBrokers.flatMap((b) => b.serviceAreas || []);
   const areaKey = areas.find((a) => addrLower.includes(String(a).toLowerCase())) || null;
 
-  const ordered = matchedBrokers.sort((a, b) => (a._id.toString() > b._id.toString() ? 1 : -1));
+  const ordered = eligibleBrokers.sort((a, b) => (a._id.toString() > b._id.toString() ? 1 : -1));
   let nextIndex = 0;
   if (areaKey) {
     const cursor = await AssignmentCursor.findOne({ areaKey });
@@ -38,11 +57,16 @@ async function assignLeadIfPossible(leadDoc) {
   const assignedAt = new Date();
 
   // idempotent update: only assign if still open and unassigned
-  await Lead.findOneAndUpdate(
+  const updatedLead = await Lead.findOneAndUpdate(
     { _id: leadDoc._id, status: 'open', $or: [ { assignedTo: null }, { assignedTo: { $exists: false } } ] },
     { $set: { status: 'assigned', assignedTo, assignedAt, areaKey } },
     { new: true }
   );
+
+  // If lead was successfully assigned, increment broker's leadsAssigned counter
+  if (updatedLead) {
+    await Broker.findByIdAndUpdate(assignedTo, { $inc: { leadsAssigned: 1 } });
+  }
 }
 
 function startLeadAssignmentWatcher(conn) {

@@ -1,4 +1,6 @@
 const Broker = require('../models/Broker');
+const Lead = require('../models/Lead');
+const Package = require('../models/Package');
 const jwt = require('jsonwebtoken');
 const JWT_SECRET = process.env.JWT_SECRET || "secret";
 
@@ -139,5 +141,101 @@ exports.verifyOtp = async (req, res) => {
   } catch (err) {
     console.error("Error verifying OTP:", err);
     return res.status(500).json({ success: false, message: "Server error", error: err.message });
+  }
+};
+
+exports.getAssignedLeads = async (req, res, next) => {
+  try {
+    const { brokerId } = req.params;
+    
+    if (!brokerId) {
+      return res.status(400).json({ message: 'brokerId is required' });
+    }
+
+    // Verify broker exists and populate package
+    const broker = await Broker.findById(brokerId).populate('currentPackage');
+    if (!broker) {
+      return res.status(404).json({ message: 'Broker not found' });
+    }
+
+    // Get all leads assigned to this broker
+    const leads = await Lead.find({ assignedTo: brokerId })
+      .sort({ assignedAt: -1 }); // Sort by most recently assigned first
+
+    // Calculate remaining leads
+    const leadsRemaining = broker.currentPackage 
+      ? broker.currentPackage.leadLimit - broker.leadsAssigned 
+      : 0;
+
+    return res.json({ 
+      message: 'Assigned leads retrieved successfully',
+      count: leads.length,
+      data: leads,
+      packageInfo: broker.currentPackage ? {
+        packageName: broker.currentPackage.name,
+        leadLimit: broker.currentPackage.leadLimit,
+        leadsAssigned: broker.leadsAssigned,
+        leadsRemaining: leadsRemaining
+      } : null
+    });
+  } catch (err) {
+    next(err);
+  }
+};
+
+exports.purchasePackage = async (req, res, next) => {
+  try {
+    const { brokerId } = req.params;
+    const { packageId } = req.body;
+
+    if (!brokerId || !packageId) {
+      return res.status(400).json({ message: 'brokerId and packageId are required' });
+    }
+
+    // Verify broker exists
+    const broker = await Broker.findById(brokerId);
+    if (!broker) {
+      return res.status(404).json({ message: 'Broker not found' });
+    }
+
+    // Verify package exists and is active
+    const package = await Package.findById(packageId);
+    if (!package) {
+      return res.status(404).json({ message: 'Package not found' });
+    }
+
+    if (!package.isActive) {
+      return res.status(400).json({ message: 'Package is not available for purchase' });
+    }
+
+    // Update broker with new package
+    broker.currentPackage = packageId;
+    broker.packagePurchasedAt = new Date();
+    broker.leadsAssigned = 0; // Reset lead counter
+    await broker.save();
+
+    // Populate package details for response
+    await broker.populate('currentPackage');
+
+    return res.json({
+      message: 'Package purchased successfully',
+      data: {
+        broker: {
+          id: broker._id,
+          name: broker.name,
+          phoneNumber: broker.phoneNumber
+        },
+        package: {
+          id: broker.currentPackage._id,
+          name: broker.currentPackage.name,
+          leadLimit: broker.currentPackage.leadLimit,
+          price: broker.currentPackage.price
+        },
+        purchasedAt: broker.packagePurchasedAt,
+        leadsRemaining: broker.currentPackage.leadLimit
+      }
+    });
+  } catch (err) {
+    next(err);
   }
 };

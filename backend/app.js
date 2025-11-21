@@ -11,6 +11,7 @@ var indexRouter = require('./routes/index');
 var usersRouter = require('./routes/users');
 var leadsRouter = require('./routes/leads');
 var brokersRouter = require('./routes/brokers');
+var packagesRouter = require('./routes/packages');
 const cors = require('cors');
 
 var app = express();
@@ -67,6 +68,7 @@ app.use('/', indexRouter);
 app.use('/users', usersRouter);
 app.use('/api/leads', leadsRouter);
 app.use('/api/brokers', brokersRouter);
+app.use('/api/packages', packagesRouter);
 
 // catch 404 and forward to error handler
 app.use(function(req, res, next) {
