@@ -14,8 +14,24 @@ exports.createLead = async (req, res, next) => {
     let matchedBrokers = [];
     if (address) {
       const addrLower = address.toLowerCase();
-      const brokers = await Broker.find({ serviceAreas: { $exists: true, $ne: [] } }).lean();
+      // Populate currentPackage to check lead limits
+      const brokers = await Broker.find({ serviceAreas: { $exists: true, $ne: [] } })
+        .populate('currentPackage')
+        .lean();
       matchedBrokers = brokers.filter((b) => (b.serviceAreas || []).some((a) => addrLower.includes(String(a).toLowerCase())));
+      
+      // Filter brokers who have active packages with remaining leads
+      matchedBrokers = matchedBrokers.filter((b) => {
+        // Must have a current package
+        if (!b.currentPackage) return false;
+        
+        // Must have remaining leads (leadsAssigned < leadLimit)
+        const leadsAssigned = b.leadsAssigned || 0;
+        const leadLimit = b.currentPackage.leadLimit || 0;
+        
+        return leadsAssigned < leadLimit;
+      });
+      
       if (matchedBrokers.length) {
         const areas = matchedBrokers.flatMap((b) => b.serviceAreas || []);
         areaKey = areas.find((a) => addrLower.includes(String(a).toLowerCase())) || null;
@@ -48,6 +64,12 @@ exports.createLead = async (req, res, next) => {
     }
 
     const lead = await Lead.create({ name, phoneNumber, address, budget, flatType, status, areaKey, assignedTo, assignedAt });
+    
+    // Increment broker's leadsAssigned counter if lead was assigned
+    if (assignedTo) {
+      await Broker.findByIdAndUpdate(assignedTo, { $inc: { leadsAssigned: 1 } });
+    }
+    
     return res.status(201).json({ message: 'Lead created', data: lead });
   } catch (err) {
     next(err);
