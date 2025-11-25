@@ -170,7 +170,14 @@ exports.getAssignedLeads = async (req, res, next) => {
     return res.json({ 
       message: 'Assigned leads retrieved successfully',
       count: leads.length,
-      data: leads,
+      data: leads.map(lead => {
+        const isContacted = lead.status === 'contacted';
+        return {
+          ...lead.toObject(),
+          name: isContacted ? lead.name : null,
+          phoneNumber: isContacted ? lead.phoneNumber : null
+        };
+      }),
       packageInfo: broker.currentPackage ? {
         packageName: broker.currentPackage.name,
         leadLimit: broker.currentPackage.leadLimit,
