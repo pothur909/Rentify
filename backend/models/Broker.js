@@ -13,6 +13,9 @@ const BrokerSchema = new mongoose.Schema(
       type: [String],
       default: [],
     },
+    currentPackage: { type: mongoose.Schema.Types.ObjectId, ref: 'Package' },
+    packagePurchasedAt: { type: Date },
+    leadsAssigned: { type: Number, default: 0 },
   },
   { timestamps: true }
 );

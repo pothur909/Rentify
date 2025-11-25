@@ -7,10 +7,11 @@ const LeadSchema = new mongoose.Schema(
     address: { type: String, required: false, trim: true },
     budget: { type: Number, required: false },
     flatType: { type: String, required: false, trim: true },
-    status: { type: String, enum: ['open', 'assigned', 'closed'], default: 'open' },
+    status: { type: String, enum: ['open', 'assigned', 'closed','contacted'], default: 'open' },
     areaKey: { type: String, trim: true },
     assignedTo: { type: mongoose.Schema.Types.ObjectId, ref: 'Broker' },
     assignedAt: { type: Date },
+    remark: { type: String, trim: true },
   },
   { timestamps: true }
 );
