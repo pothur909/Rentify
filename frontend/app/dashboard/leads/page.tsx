@@ -1,21 +1,3 @@
-// export default function LeadsPage() {
-//   const leads = {
-//     total: 50,
-//     contacted: 20,
-//     upcoming: 10,
-//   };
-
-//   return (
-//     <div className="text-black">
-//       <h1 className="text-2xl font-bold mb-4">Leads</h1>
-//       <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
-//         <div className="p-4 bg-white rounded shadow">Total Leads: {leads.total}</div>
-//         <div className="p-4 bg-white rounded shadow">Contacted Leads: {leads.contacted}</div>
-//         <div className="p-4 bg-white rounded shadow">Upcoming Leads: {leads.upcoming}</div>
-//       </div>
-//     </div>
-//   );
-// }
 
 'use client'
 

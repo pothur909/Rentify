@@ -1,3 +1,4 @@
+require('dotenv').config();
 var createError = require('http-errors');
 var express = require('express');
 var path = require('path');
@@ -11,6 +12,10 @@ var indexRouter = require('./routes/index');
 var usersRouter = require('./routes/users');
 var leadsRouter = require('./routes/leads');
 var brokersRouter = require('./routes/brokers');
+const razorPaymentRouter = require('./routes/razorPayment.routs');
+const leadPackageRouter = require('./routes/leadPackage.routes');
+
+
 const cors = require('cors');
 
 var app = express();
@@ -20,10 +25,6 @@ app.set('views', path.join(__dirname, 'views'));
 app.set('view engine', 'jade');
 
 app.use(logger('dev'));
-app.use(express.json());
-app.use(express.urlencoded({ extended: false }));
-app.use(cookieParser());
-app.use(express.static(path.join(__dirname, 'public')));
 
 // Robust CORS setup (like your second project)
 const corsOptions = {
@@ -46,6 +47,26 @@ const corsOptions = {
 };
 app.use(cors(corsOptions));
 
+// raw for webhook must be before express.json
+
+app.use(
+  '/api/payments/webhook',
+  express.raw({ type: 'application/json' }),
+  (req, res, next) => {
+    // here req.body is a Buffer
+    req.rawBody = req.body;
+    next();
+  }
+);
+
+
+app.use(express.json());
+app.use(express.urlencoded({ extended: false }));
+app.use(cookieParser());
+app.use(express.static(path.join(__dirname, 'public')));
+
+
+
 // MongoDB connection (update URI as needed)
 mongoose
   .connect(process.env.MONGO_URI, {
@@ -67,6 +88,8 @@ app.use('/', indexRouter);
 app.use('/users', usersRouter);
 app.use('/api/leads', leadsRouter);
 app.use('/api/brokers', brokersRouter);
+app.use('/api/payments', razorPaymentRouter);
+app.use('/api/lead-packages', leadPackageRouter);
 
 // catch 404 and forward to error handler
 app.use(function(req, res, next) {

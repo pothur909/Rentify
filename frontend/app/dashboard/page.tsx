@@ -1,27 +1,4 @@
 
-// export default function OverviewPage() {
-//   // Dummy stats
-//   const stats = {
-//     totalLeads: 30,
-//     contactedLeads: 20,
-//     convertedLeads: 10,
-//     totalPackages: 5,
-//   };
-
-//   return (<>
-//     <div className="text-black">
-//       <h1 className="text-2xl font-bold mb-4">Overview</h1>
-//       <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
-//         <div className="p-4 bg-white rounded shadow">Total Leads: {stats.totalLeads}</div>
-//         <div className="p-4 bg-white rounded shadow">Contacted Leads: {stats.contactedLeads}</div>
-//         <div className="p-4 bg-white rounded shadow">Converted Leads: {stats.convertedLeads}</div>
-//         <div className="p-4 bg-white rounded shadow">Total Packages: {stats.totalPackages}</div>
-//       </div>
-//     </div>
-//     </>
-//   );
-// }
-
 
 // OverviewPage.tsx
 import { TrendingUp, Users, CheckCircle, Package } from "lucide-react";
