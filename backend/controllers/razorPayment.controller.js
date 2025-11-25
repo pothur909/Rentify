@@ -4,6 +4,8 @@ const Broker = require('../models/Broker');
 const LeadPackage = require('../models/LeadPackage');
 const PaymentTransaction = require('../models/PaymentTransaction');
 const WebhookLog = require('../models/PaymentWebhook');
+const { assignLeadPackageToBroker } = require('./packagesController');
+
 
 if (!process.env.RAZORPAY_KEY_ID || !process.env.RAZORPAY_KEY_SECRET) {
   console.error('Razorpay env vars missing');
@@ -229,6 +231,39 @@ if (broker && paymentId && !broker.paymentIds.includes(paymentId)) {
         tx.paidAt = new Date();
       }
       await tx.save();
+
+            // call your controller to assign package to broker
+      if (tx.brokerId && tx.packageId) {
+        const internalReq = {
+          body: {
+            brokerId: tx.brokerId.toString(),
+            packageId: tx.packageId.toString(),
+          },
+        };
+
+        // lightweight internal response object
+        const internalRes = {
+          status(code) {
+            this.statusCode = code;
+            return this;
+          },
+          json(payload) {
+            console.log(
+              'assignLeadPackageToBroker internal response:',
+              this.statusCode || 200,
+              payload
+            );
+          },
+        };
+
+        const internalNext = (err) => {
+          if (err) {
+            console.error('assignLeadPackageToBroker error from webhook:', err);
+          }
+        };
+
+        await assignLeadPackageToBroker(internalReq, internalRes, internalNext);
+      }
 
       webhookLog.processingMessage = 'Payment marked as paid';
       webhookLog.responseStatusCode = 200;

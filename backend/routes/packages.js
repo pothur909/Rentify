@@ -5,7 +5,8 @@ const {
   createPackage, 
   updatePackage, 
   deletePackage,
-  assignPackageToBroker
+  assignPackageToBroker,
+  assignLeadPackageToBroker
 } = require('../controllers/packagesController');
 
 // Get all active packages
@@ -21,6 +22,7 @@ router.put('/:id', updatePackage);
 router.delete('/:id', deletePackage);
 
 // Assign package to broker
-router.post('/assign', assignPackageToBroker);
+// router.post('/assign', assignPackageToBroker);
+router.post('/assign', assignLeadPackageToBroker);
 
 module.exports = router;

@@ -13,7 +13,7 @@ const BrokerSchema = new mongoose.Schema(
       type: [String],
       default: [],
     },
-    currentPackage: { type: mongoose.Schema.Types.ObjectId, ref: 'Package' },
+    currentPackage: { type: mongoose.Schema.Types.ObjectId, ref: 'LeadPackage' },
     packagePurchasedAt: { type: Date },
     leadsAssigned: { type: Number, default: 0 },
   },
