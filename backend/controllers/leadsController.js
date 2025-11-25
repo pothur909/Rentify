@@ -4,7 +4,7 @@ const AssignmentCursor = require('../models/AssignmentCursor');
 
 exports.createLead = async (req, res, next) => {
   try {
-    const { name, phoneNumber, address, budget, flatType } = req.body;
+    const { name, phoneNumber, address, budget, flatType, remark } = req.body;
 
     if (!name || !phoneNumber) {
       return res.status(400).json({ message: 'name and phoneNumber are required' });
@@ -63,7 +63,7 @@ exports.createLead = async (req, res, next) => {
       status = 'assigned';
     }
 
-    const lead = await Lead.create({ name, phoneNumber, address, budget, flatType, status, areaKey, assignedTo, assignedAt });
+    const lead = await Lead.create({ name, phoneNumber, address, budget, flatType, status, areaKey, assignedTo, assignedAt, remark });
     
     // Increment broker's leadsAssigned counter if lead was assigned
     if (assignedTo) {
@@ -71,6 +71,95 @@ exports.createLead = async (req, res, next) => {
     }
     
     return res.status(201).json({ message: 'Lead created', data: lead });
+  } catch (err) {
+    next(err);
+  }
+};
+
+exports.addRemark = async (req, res, next) => {
+  try {
+    const { leadId } = req.params;
+    const { remark } = req.body;
+
+    if (!leadId) {
+      return res.status(400).json({ message: 'leadId is required' });
+    }
+
+    if (!remark) {
+      return res.status(400).json({ message: 'remark is required' });
+    }
+
+    const lead = await Lead.findById(leadId);
+    if (!lead) {
+      return res.status(404).json({ message: 'Lead not found' });
+    }
+
+    lead.remark = remark;
+    await lead.save();
+
+    return res.json({ message: 'Remark added successfully', data: lead });
+  } catch (err) {
+    next(err);
+  }
+};
+
+exports.updateStatus = async (req, res, next) => {
+  try {
+    const { leadId } = req.params;
+    const { status } = req.body;
+
+    if (!leadId) {
+      return res.status(400).json({ message: 'leadId is required' });
+    }
+
+    if (!status) {
+      return res.status(400).json({ message: 'status is required' });
+    }
+
+    const allowedStatuses = ['open', 'assigned', 'closed', 'contacted'];
+    if (!allowedStatuses.includes(status)) {
+      return res.status(400).json({ message: `Invalid status. Allowed values: ${allowedStatuses.join(', ')}` });
+    }
+
+    const lead = await Lead.findById(leadId);
+    if (!lead) {
+      return res.status(404).json({ message: 'Lead not found' });
+    }
+
+    lead.status = status;
+    await lead.save();
+
+    return res.json({ message: 'Status updated successfully', data: lead });
+  } catch (err) {
+    next(err);
+  }
+};
+
+exports.revealContactDetails = async (req, res, next) => {
+  try {
+    const { leadId } = req.params;
+
+    if (!leadId) {
+      return res.status(400).json({ message: 'leadId is required' });
+    }
+
+    const lead = await Lead.findById(leadId);
+    if (!lead) {
+      return res.status(404).json({ message: 'Lead not found' });
+    }
+
+    lead.status = 'contacted';
+    await lead.save();
+
+    return res.json({ 
+      message: 'Contact details revealed', 
+      data: {
+        _id: lead._id,
+        name: lead.name,
+        phoneNumber: lead.phoneNumber,
+        status: lead.status
+      }
+    });
   } catch (err) {
     next(err);
   }
