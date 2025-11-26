@@ -9,7 +9,7 @@ const BrokerSchema = new mongoose.Schema(
     address: { type: String, trim: true },
     otpCode: { type: String },
     otpExpires: { type: Date },
-        paymentIds: {
+    paymentIds: {
       type: [String],
       default: [],
     },

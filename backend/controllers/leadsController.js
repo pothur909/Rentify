@@ -101,8 +101,8 @@ exports.createLead = async (req, res, next) => {
       matchedBrokers = matchedBrokers.filter((b) => {
         if (!b.currentPackage) return false;
         const leadsAssigned = b.leadsAssigned || 0;
-        const leadLimit = b.currentPackage.leadLimit || 0;
-        return leadsAssigned < leadLimit;
+        const leadsCount = b.currentPackage.leadsCount || 0;
+        return leadsAssigned < leadsCount;
       });
     } else if (address) {
       // optional fallback if areaKey not provided
@@ -118,8 +118,8 @@ exports.createLead = async (req, res, next) => {
       matchedBrokers = matchedBrokers.filter((b) => {
         if (!b.currentPackage) return false;
         const leadsAssigned = b.leadsAssigned || 0;
-        const leadLimit = b.currentPackage.leadLimit || 0;
-        return leadsAssigned < leadLimit;
+        const leadsCount = b.currentPackage.leadsCount || 0;
+        return leadsAssigned < leadsCount;
       });
 
       if (matchedBrokers.length) {

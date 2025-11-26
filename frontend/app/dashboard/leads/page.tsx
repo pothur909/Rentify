@@ -39,7 +39,7 @@ export default function LeadsPage() {
 
   const getStatusColor = (status: string) => {
     switch (status) {
-      case "open":
+      case "new":
         return "bg-blue-100 text-blue-700";
       case "contacted":
         return "bg-purple-100 text-purple-700";
@@ -51,7 +51,8 @@ export default function LeadsPage() {
   // map backend status to UI status
   const getUiStatus = (lead: any) => {
     if (lead.status === "contacted") return "contacted";
-    return "open"; // treat others as open/new
+    if (lead.status === "assigned") return "new";
+    return "new"; // treat others as open/new
   };
 
   const maskName = (lead: any) => {
@@ -223,7 +224,7 @@ export default function LeadsPage() {
   // stats
   const totalLeads = leads.length;
   const contactedCount = leads.filter((l) => l.status === "contacted").length;
-  const openCount = leads.filter((l) => l.status === "open").length;
+  const openCount = leads.filter((l) => l.status === "assigned").length;
   const totalPackageLeads = packageInfo?.leadLimit || 0;
   const upcomingLeads = packageInfo?.leadsRemaining || 0;
 
@@ -242,7 +243,7 @@ export default function LeadsPage() {
       gradient: "from-blue-500 to-blue-600",
       bg: "bg-blue-50",
       iconBg: "bg-blue-500",
-      change: stats.openTotal,
+      change: stats.total,
       changeType: "increase",
     },
     {
@@ -278,25 +279,63 @@ export default function LeadsPage() {
   ];
 
   // filter
+  // const filteredLeads = leads
+  //   .filter((lead) => {
+  //     const term = searchTerm.toLowerCase();
+  //     const name = lead.name || "";
+  //     const phone = lead.phoneNumber || "";
+  //     const location = lead.address || lead.areaKey || "";
+  //     return (
+  //       name.toLowerCase().includes(term) ||
+  //       phone.toLowerCase().includes(term) ||
+  //       location.toLowerCase().includes(term)
+  //     );
+  //   })
+  //   .filter((lead) => {
+  //     const uiStatus = getUiStatus(lead);
+  //     if (filterStatus === "all") return true;
+  //     if (filterStatus === "new") return uiStatus === "open";
+  //     if (filterStatus === "contacted") return uiStatus === "contacted";
+  //     return true;
+  //   });
+
   const filteredLeads = leads
-    .filter((lead) => {
-      const term = searchTerm.toLowerCase();
-      const name = lead.name || "";
-      const phone = lead.phoneNumber || "";
-      const location = lead.address || lead.areaKey || "";
-      return (
-        name.toLowerCase().includes(term) ||
-        phone.toLowerCase().includes(term) ||
-        location.toLowerCase().includes(term)
-      );
-    })
-    .filter((lead) => {
-      const uiStatus = getUiStatus(lead);
-      if (filterStatus === "all") return true;
-      if (filterStatus === "new") return uiStatus === "open";
-      if (filterStatus === "contacted") return uiStatus === "contacted";
-      return true;
-    });
+  .filter((lead) => {
+    const term = searchTerm.toLowerCase();
+    const name = lead.name || "";
+    const phone = lead.phoneNumber || "";
+    const location = lead.address || lead.areaKey || "";
+    return (
+      name.toLowerCase().includes(term) ||
+      phone.toLowerCase().includes(term) ||
+      location.toLowerCase().includes(term)
+    );
+  })
+  .filter((lead) => {
+    if (filterStatus === "all") return true;
+
+    if (filterStatus === "new") {
+      // new = assigned (not contacted yet)
+      return lead.status === "assigned";
+    }
+
+    if (filterStatus === "contacted") {
+      return lead.status === "contacted";
+    }
+
+    if (filterStatus === "upcoming") {
+      // you can decide what upcoming means; for now, nothing
+      return false;
+    }
+
+    if (filterStatus === "converted") {
+      // if you later use closed as converted:
+      return lead.status === "closed";
+    }
+
+    return true;
+  });
+
 
   if (loading) {
     return <div className="p-6 text-gray-700">Loading leads...</div>;
