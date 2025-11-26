@@ -246,3 +246,42 @@ exports.purchasePackage = async (req, res, next) => {
     next(err);
   }
 };
+
+exports.getAllBrokersForAdmin = async (req, res, next) => {
+  try {
+    // Get pagination parameters from query string
+    const page = parseInt(req.query.page) || 1;
+    const limit = parseInt(req.query.limit) || 10;
+    const skip = (page - 1) * limit;
+
+    // Get total count for pagination metadata
+    const totalCount = await Broker.countDocuments();
+
+    // Fetch paginated brokers
+    const brokers = await Broker.find()
+      .populate('currentPackage', 'name leadLimit price isActive')
+      .sort({ createdAt: -1 })
+      .skip(skip)
+      .limit(limit)
+      .lean();
+
+    // Calculate pagination metadata
+    const totalPages = Math.ceil(totalCount / limit);
+    const hasMore = page < totalPages;
+
+    return res.json({ 
+      message: 'Brokers fetched successfully', 
+      pagination: {
+        currentPage: page,
+        pageSize: limit,
+        totalCount: totalCount,
+        totalPages: totalPages,
+        hasMore: hasMore
+      },
+      data: brokers
+    });
+  } catch (err) {
+    next(err);
+  }
+};
+

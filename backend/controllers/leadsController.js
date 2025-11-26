@@ -14,27 +14,41 @@ exports.createLead = async (req, res, next) => {
     let matchedBrokers = [];
     if (address) {
       const addrLower = address.toLowerCase();
+      console.log('🔍 Looking for brokers with address:', addrLower);
+      
       // Populate currentPackage to check lead limits
       const brokers = await Broker.find({ serviceAreas: { $exists: true, $ne: [] } })
         .populate('currentPackage')
         .lean();
+      console.log('📋 Total brokers with service areas:', brokers.length);
+      
       matchedBrokers = brokers.filter((b) => (b.serviceAreas || []).some((a) => addrLower.includes(String(a).toLowerCase())));
+      console.log('✅ Brokers matching address:', matchedBrokers.length);
+      console.log('📍 Matched brokers:', matchedBrokers.map(b => ({ name: b.name, areas: b.serviceAreas, package: b.currentPackage?._id, leadsAssigned: b.leadsAssigned })));
       
       // Filter brokers who have active packages with remaining leads
       matchedBrokers = matchedBrokers.filter((b) => {
         // Must have a current package
-        if (!b.currentPackage) return false;
+        if (!b.currentPackage) {
+          console.log(`❌ Broker ${b.name} has no current package`);
+          return false;
+        }
         
         // Must have remaining leads (leadsAssigned < leadLimit)
         const leadsAssigned = b.leadsAssigned || 0;
         const leadLimit = b.currentPackage.leadLimit || 0;
         
+        console.log(`📊 Broker ${b.name}: ${leadsAssigned}/${leadLimit} leads assigned`);
+        
         return leadsAssigned < leadLimit;
       });
+      
+      console.log('🎯 Final eligible brokers:', matchedBrokers.length);
       
       if (matchedBrokers.length) {
         const areas = matchedBrokers.flatMap((b) => b.serviceAreas || []);
         areaKey = areas.find((a) => addrLower.includes(String(a).toLowerCase())) || null;
+        console.log('🗺️ Area key selected:', areaKey);
       }
     }
 
@@ -159,6 +173,44 @@ exports.revealContactDetails = async (req, res, next) => {
         phoneNumber: lead.phoneNumber,
         status: lead.status
       }
+    });
+  } catch (err) {
+    next(err);
+  }
+};
+
+exports.getAllLeadsForAdmin = async (req, res, next) => {
+  try {
+    // Get pagination parameters from query string
+    const page = parseInt(req.query.page) || 1;
+    const limit = parseInt(req.query.limit) || 10;
+    const skip = (page - 1) * limit;
+
+    // Get total count for pagination metadata
+    const totalCount = await Lead.countDocuments();
+
+    // Fetch paginated leads
+    const leads = await Lead.find()
+      .populate('assignedTo', 'name email phoneNumber serviceAreas')
+      .sort({ createdAt: -1 })
+      .skip(skip)
+      .limit(limit)
+      .lean();
+
+    // Calculate pagination metadata
+    const totalPages = Math.ceil(totalCount / limit);
+    const hasMore = page < totalPages;
+
+    return res.json({ 
+      message: 'Leads fetched successfully', 
+      pagination: {
+        currentPage: page,
+        pageSize: limit,
+        totalCount: totalCount,
+        totalPages: totalPages,
+        hasMore: hasMore
+      },
+      data: leads
     });
   } catch (err) {
     next(err);
