@@ -1,6 +1,9 @@
 var express = require('express');
 var router = express.Router();
-const { signup, requestOtp, verifyOtp, getAssignedLeads, purchasePackage } = require('../controllers/brokersController');
+const { signup, requestOtp, verifyOtp, getAssignedLeads, purchasePackage, getAllBrokersForAdmin } = require('../controllers/brokersController');
+
+// Admin route to get all brokers
+router.get('/admin/all', getAllBrokersForAdmin);
 
 // Signup new broker
 router.post('/signup', signup);
@@ -16,3 +19,4 @@ router.post('/:brokerId/purchase-package', purchasePackage);
 router.get('/:brokerId/assigned-leads', getAssignedLeads);
 
 module.exports = router;
+
