@@ -9,7 +9,11 @@ const BrokerSchema = new mongoose.Schema(
     address: { type: String, trim: true },
     otpCode: { type: String },
     otpExpires: { type: Date },
-    currentPackage: { type: mongoose.Schema.Types.ObjectId, ref: 'Package' },
+    paymentIds: {
+      type: [String],
+      default: [],
+    },
+    currentPackage: { type: mongoose.Schema.Types.ObjectId, ref: 'LeadPackage' },
     packagePurchasedAt: { type: Date },
     leadsAssigned: { type: Number, default: 0 },
   },

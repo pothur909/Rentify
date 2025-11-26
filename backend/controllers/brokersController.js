@@ -164,7 +164,7 @@ exports.getAssignedLeads = async (req, res, next) => {
 
     // Calculate remaining leads
     const leadsRemaining = broker.currentPackage 
-      ? broker.currentPackage.leadLimit - broker.leadsAssigned 
+      ? broker.currentPackage.leadsCount - broker.leadsAssigned 
       : 0;
 
     return res.json({ 
@@ -189,6 +189,12 @@ exports.getAssignedLeads = async (req, res, next) => {
     next(err);
   }
 };
+
+
+
+
+
+//////////purchase package controller is not in use and also the package import also const Package = require('../models/Package'); ////////////
 
 exports.purchasePackage = async (req, res, next) => {
   try {

@@ -27,9 +27,9 @@ async function assignLeadIfPossible(leadDoc) {
     
     // Must have remaining leads (leadsAssigned < leadLimit)
     const leadsAssigned = b.leadsAssigned || 0;
-    const leadLimit = b.currentPackage.leadLimit || 0;
+    const leadsCount = b.currentPackage.leadsCount || 0;
     
-    return leadsAssigned < leadLimit;
+    return leadsAssigned < leadsCount;
   });
 
   if (!eligibleBrokers.length) return; // no eligible brokers with package capacity
