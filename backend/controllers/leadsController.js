@@ -270,3 +270,41 @@ exports.revealContactDetails = async (req, res, next) => {
     next(err);
   }
 };
+
+exports.getAllLeadsForAdmin = async (req, res, next) => {
+  try {
+    // Get pagination parameters from query string
+    const page = parseInt(req.query.page) || 1;
+    const limit = parseInt(req.query.limit) || 10;
+    const skip = (page - 1) * limit;
+
+    // Get total count for pagination metadata
+    const totalCount = await Lead.countDocuments();
+
+    // Fetch paginated leads
+    const leads = await Lead.find()
+      .populate('assignedTo', 'name email phoneNumber serviceAreas')
+      .sort({ createdAt: -1 })
+      .skip(skip)
+      .limit(limit)
+      .lean();
+
+    // Calculate pagination metadata
+    const totalPages = Math.ceil(totalCount / limit);
+    const hasMore = page < totalPages;
+
+    return res.json({ 
+      message: 'Leads fetched successfully', 
+      pagination: {
+        currentPage: page,
+        pageSize: limit,
+        totalCount: totalCount,
+        totalPages: totalPages,
+        hasMore: hasMore
+      },
+      data: leads
+    });
+  } catch (err) {
+    next(err);
+  }
+};
