@@ -1,138 +1,4 @@
 
-// "use client";
-
-// import { useState, useEffect } from "react";
-// import { useAuthContext } from "../context/AuthContext";
-// import { useRouter } from "next/navigation";
-
-// export default function BrokerLogin() {
-//   const { login, isAuthenticated } = useAuthContext();
-//   const router = useRouter();
-
-//   const [phoneNumber, setPhoneNumber] = useState("");
-//   const [otp, setOtp] = useState("");
-//   const [step, setStep] = useState<"phone" | "otp">("phone");
-//   const [timer, setTimer] = useState(0);
-//   const [canResend, setCanResend] = useState(true);
-//   const [message, setMessage] = useState("");
-
-//   const baseUrl = process.env.NEXT_PUBLIC_BASE_URL || "http://localhost:7000";
-
-//   // Redirect if already logged in
-//   useEffect(() => {
-//     if (isAuthenticated) router.push("/dashboard");
-//   }, [isAuthenticated, router]);
-
-//   // Countdown timer
-//   useEffect(() => {
-//     if (timer <= 0) return;
-//     const interval = setInterval(() => setTimer(t => t - 1), 1000);
-//     return () => clearInterval(interval);
-//   }, [timer]);
-
-//   useEffect(() => {
-//     setCanResend(timer <= 0);
-//   }, [timer]);
-
-//   // Send OTP
-//   const sendOtp = async () => {
-//     if (!phoneNumber) return;
-//     try {
-//       const res = await fetch(`${baseUrl}/api/brokers/login/request-otp`, {
-//         method: "POST",
-//         headers: { "Content-Type": "application/json" },
-//         body: JSON.stringify({ phoneNumber }),
-//       });
-//       const data = await res.json();
-//       if (res.ok) {
-//         setStep("otp");
-//         setTimer(30);
-//         setMessage("OTP sent to your phone");
-//       } else setMessage(data.message);
-//     } catch (err) {
-//       console.error(err);
-//       setMessage("Failed to send OTP");
-//     }
-//   };
-
-//   // Verify OTP
-//   const verifyOtp = async () => {
-//     try {
-//       const res = await fetch(`${baseUrl}/api/brokers/login/verify`, {
-//         method: "POST",
-//         headers: { "Content-Type": "application/json" },
-//         body: JSON.stringify({ phoneNumber, otp }),
-//       });
-//       const data = await res.json();
-// if (res.ok) {
-//   login(data.token, data.broker); // Save token and broker to context/localStorage
-//   router.push("/dashboard");     // Redirect to dashboard immediately
-// } setMessage(data.message);
-//     } catch (err) {
-//       console.error(err);
-//       setMessage("Failed to verify OTP");
-//     }
-//   };
-
-//   const changePhoneNumber = () => {
-//     setStep("phone");
-//     setOtp("");
-//     setMessage("");
-//     setTimer(0);
-//   };
-
-//   return (
-//     <div className="p-8 max-w-md mx-auto text-black bg-white rounded">
-//       {step === "phone" ? (
-//         <>
-//           <h2 className="text-2xl font-bold mb-4">Broker Login</h2>
-//           <input
-//             placeholder="Phone +91..."
-//             value={phoneNumber}
-//             onChange={e => setPhoneNumber(e.target.value)}
-//             className="border p-2 w-full mb-2"
-//           />
-//           <button onClick={sendOtp} className="bg-blue-500 text-white p-2 w-full">
-//             Send OTP
-//           </button>
-//         </>
-//       ) : (
-//         <>
-//           <h2 className="text-2xl font-bold mb-4">Enter OTP</h2>
-//           <input
-//             placeholder="OTP"
-//             value={otp}
-//             onChange={e => setOtp(e.target.value)}
-//             className="border p-2 w-full mb-2"
-//           />
-//           <button
-//             onClick={verifyOtp}
-//             className="bg-green-500 text-white p-2 w-full mb-2"
-//           >
-//             Verify OTP & Login
-//           </button>
-
-//           <button onClick={changePhoneNumber} className="bg-gray-300 p-2 w-full mb-2">
-//             Change Phone Number
-//           </button>
-
-//           <button
-//             onClick={sendOtp}
-//             className={`p-2 w-full ${
-//               canResend ? "bg-blue-500 text-white" : "bg-gray-300 text-gray-600 cursor-not-allowed"
-//             }`}
-//             disabled={!canResend}
-//           >
-//             {canResend ? "Resend OTP" : `Resend OTP in ${timer}s`}
-//           </button>
-//         </>
-//       )}
-//       {message && <p className="mt-2 text-red-500">{message}</p>}
-//     </div>
-//   );
-// }
-
-
 "use client";
 
 import { useState, useEffect } from "react";
@@ -160,6 +26,9 @@ export default function BrokerAuth() {
   const [serviceAreas, setServiceAreas] = useState<string[]>([""]);
   const [availableFlatTypes, setAvailableFlatTypes] = useState<string[]>([""]);
   const [address, setAddress] = useState("");
+
+const [monthlyFlatsAvailable, setMonthlyFlatsAvailable] = useState("");
+const [customerExpectations, setCustomerExpectations] = useState("");
   
   const [message, setMessage] = useState("");
   const baseUrl = process.env.NEXT_PUBLIC_BASE_URL || "http://localhost:7000";
@@ -241,6 +110,10 @@ export default function BrokerAuth() {
       serviceAreas: serviceAreas.filter(s => s.trim() !== ""),
       availableFlatTypes: availableFlatTypes.filter(f => f.trim() !== ""),
       address,
+       monthlyFlatsAvailable: monthlyFlatsAvailable
+      ? Number(monthlyFlatsAvailable)
+      : undefined,
+    customerExpectations: customerExpectations || undefined,
     };
 
     try {
@@ -433,7 +306,7 @@ export default function BrokerAuth() {
                     </button>
                   </div>
                 ) : (
-                  <div className="space-y-4 text-black ">
+                  <div className="space-y-4">
                     <div>
                       <label className="block text-sm font-medium text-gray-700 mb-2">
                         Enter OTP
@@ -589,6 +462,34 @@ export default function BrokerAuth() {
                       rows={3}
                     />
                   </div>
+
+                  <div>
+  <label className="block text-sm font-medium text-gray-700 mb-2">
+    No. of flats available per month (optional)
+  </label>
+  <input
+    type="number"
+    min={0}
+    value={monthlyFlatsAvailable}
+    onChange={e => setMonthlyFlatsAvailable(e.target.value)}
+    placeholder="e.g., 10"
+    className="w-full px-4 py-3 border-2 border-gray-200 rounded-xl focus:border-blue-500 focus:outline-none transition-colors"
+  />
+</div>
+
+<div>
+  <label className="block text-sm font-medium text-gray-700 mb-2">
+    Expectations from customers (optional)
+  </label>
+  <textarea
+    value={customerExpectations}
+    onChange={e => setCustomerExpectations(e.target.value)}
+    placeholder="Any notes or conditions you expect from tenants"
+    className="w-full px-4 py-3 border-2 border-gray-200 rounded-xl focus:border-blue-500 focus:outline-none transition-colors"
+    rows={3}
+  />
+</div>
+
 
                   <button
                     onClick={handleSignup}

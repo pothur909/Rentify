@@ -7,9 +7,17 @@ const BrokerSchema = new mongoose.Schema(
     serviceAreas: { type: [String], default: [] },
     availableFlatTypes: { type: [String], default: [] },
     address: { type: String, trim: true },
+
+    monthlyFlatsAvailable: { type: Number, default: 0 },          // optional
+    customerExpectations: { type: String, trim: true },           // optional
+
     otpCode: { type: String },
     otpExpires: { type: Date },
-    currentPackage: { type: mongoose.Schema.Types.ObjectId, ref: 'Package' },
+    paymentIds: {
+      type: [String],
+      default: [],
+    },
+    currentPackage: { type: mongoose.Schema.Types.ObjectId, ref: 'LeadPackage' },
     packagePurchasedAt: { type: Date },
     leadsAssigned: { type: Number, default: 0 },
   },

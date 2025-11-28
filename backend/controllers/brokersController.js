@@ -6,7 +6,11 @@ const JWT_SECRET = process.env.JWT_SECRET || "secret";
 
 exports.signup = async (req, res, next) => {
   try {
-    const { name, phoneNumber, serviceAreas, availableFlatTypes, address } = req.body;
+    const { name, phoneNumber, serviceAreas, availableFlatTypes, address,
+            monthlyFlatsAvailable,      
+      customerExpectations        
+
+     } = req.body;
     if (!name || !phoneNumber) {
       return res.status(400).json({ message: 'name and phoneNumber are required' });
     }
@@ -22,6 +26,10 @@ exports.signup = async (req, res, next) => {
       serviceAreas: Array.isArray(serviceAreas) ? serviceAreas : (serviceAreas ? [serviceAreas] : []),
       availableFlatTypes: Array.isArray(availableFlatTypes) ? availableFlatTypes : (availableFlatTypes ? [availableFlatTypes] : []),
       address,
+         monthlyFlatsAvailable: monthlyFlatsAvailable
+        ? Number(monthlyFlatsAvailable)
+        : 0,
+      customerExpectations: customerExpectations || '',
     });
 
     return res.status(201).json({ message: 'Broker signed up', data: broker });
@@ -135,7 +143,9 @@ exports.verifyOtp = async (req, res) => {
         phoneNumber: broker.phoneNumber,
         serviceAreas: broker.serviceAreas,
         availableFlatTypes: broker.availableFlatTypes,
-        address: broker.address
+        address: broker.address,
+        monthlyFlatsAvailable: broker.monthlyFlatsAvailable,   // NEW
+        customerExpectations: broker.customerExpectations
       }
     });
   } catch (err) {
@@ -164,7 +174,7 @@ exports.getAssignedLeads = async (req, res, next) => {
 
     // Calculate remaining leads
     const leadsRemaining = broker.currentPackage 
-      ? broker.currentPackage.leadLimit - broker.leadsAssigned 
+      ? broker.currentPackage.leadsCount - broker.leadsAssigned 
       : 0;
 
     return res.json({ 
@@ -189,6 +199,12 @@ exports.getAssignedLeads = async (req, res, next) => {
     next(err);
   }
 };
+
+
+
+
+
+//////////purchase package controller is not in use and also the package import also const Package = require('../models/Package'); ////////////
 
 exports.purchasePackage = async (req, res, next) => {
   try {

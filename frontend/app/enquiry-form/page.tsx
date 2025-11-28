@@ -38,6 +38,7 @@ export default function EnquiryForm() {
     address: '',
     budget: '',
     flatType: '',
+    areaKey: '',
   });
 
   const [loading, setLoading] = useState(false);
@@ -84,11 +85,22 @@ export default function EnquiryForm() {
     setFormData({ ...formData, [e.target.name]: e.target.value });
   };
 
+  // const handleAreaSelect = (area: string) => {
+  //   setFormData({ ...formData, address: area });
+  //   setSearchTerm(area);
+  //   setShowSuggestions(false);
+  // };
+
   const handleAreaSelect = (area: string) => {
-    setFormData({ ...formData, address: area });
-    setSearchTerm(area);
-    setShowSuggestions(false);
-  };
+  setFormData({
+    ...formData,
+    address: 'Bangalore', // city fixed
+    areaKey: area,        // this is the service area
+  });
+  setSearchTerm(area);
+  setShowSuggestions(false);
+};
+
 
   const handleSubmit = async () => {
     setLoading(true);
@@ -115,9 +127,10 @@ export default function EnquiryForm() {
         body: JSON.stringify({
           name: formData.name,
           phoneNumber: '+91' + formData.phoneNumber,
-          address: formData.address,
+          address: formData.address || 'Bangalore',
           budget: budgetValue,
           flatType: formData.flatType,
+          areaKey: formData.areaKey,  
         }),
       });
 
@@ -125,7 +138,7 @@ export default function EnquiryForm() {
 
       if (response.ok) {
         setMessage({ type: 'success', text: 'Enquiry submitted successfully! We will contact you soon.' });
-        setFormData({ name: '', phoneNumber: '', address: '', budget: '', flatType: '' });
+        setFormData({ name: '', phoneNumber: '', address: '', budget: '', flatType: '', areaKey: '', });
         setSearchTerm('');
       } else {
         setMessage({ type: 'error', text: data.message || 'Something went wrong.' });
@@ -267,7 +280,7 @@ export default function EnquiryForm() {
                   </label>
                   <div className="relative">
                     <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 text-gray-400 w-5 h-5" />
-                    <input
+                    {/* <input
                       type="text"
                       value={searchTerm}
                       onChange={(e) => {
@@ -279,7 +292,22 @@ export default function EnquiryForm() {
                       placeholder="Search or select location"
                       className="w-full pl-12 pr-4 py-3 border-2 border-gray-200 rounded-xl focus:border-blue-500 focus:outline-none transition-colors text-black"
                       required
-                    />
+                    /> */}
+                    
+                    <input
+  type="text"
+  value={searchTerm}
+  onChange={(e) => {
+    setSearchTerm(e.target.value);
+    setShowSuggestions(true);
+  }}
+  onFocus={() => setShowSuggestions(true)}
+  placeholder="Search or select location"
+  className="w-full pl-12 pr-4 py-3 border-2 border-gray-200 rounded-xl focus:border-blue-500 focus:outline-none transition-colors text-black"
+  required
+/>
+
+
                     {showSuggestions && filteredAreas.length > 0 && (
                       <div className="absolute z-10 w-full mt-2 bg-white border-2 border-gray-200 rounded-xl shadow-xl max-h-48 overflow-y-auto">
                         {filteredAreas.map((area, index) => (
