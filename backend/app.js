@@ -12,6 +12,7 @@ var usersRouter = require('./routes/users');
 var leadsRouter = require('./routes/leads');
 var brokersRouter = require('./routes/brokers');
 var packagesRouter = require('./routes/packages');
+var subAdminsRouter = require('./routes/subAdmins');
 const cors = require('cors');
 
 var app = express();
@@ -69,6 +70,7 @@ app.use('/users', usersRouter);
 app.use('/api/leads', leadsRouter);
 app.use('/api/brokers', brokersRouter);
 app.use('/api/packages', packagesRouter);
+app.use('/api/sub-admins', subAdminsRouter);
 
 // catch 404 and forward to error handler
 app.use(function(req, res, next) {
