@@ -6,6 +6,7 @@ const router = express.Router();
 const {
   createOrder,
   handleWebhook,
+  getAllPayments,
 } = require('../controllers/razorPayment.controller');
 
 // create order
@@ -60,5 +61,7 @@ router.post(
   },
   handleWebhook
 );
+
+router.get('/payments-list', getAllPayments);
 
 module.exports = router;

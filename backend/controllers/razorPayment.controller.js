@@ -305,3 +305,78 @@ if (broker && paymentId && !broker.paymentIds.includes(paymentId)) {
     });
   }
 };
+
+
+const STATUS_LABELS = {
+  created: 'Pending',
+  paid: 'Completed',
+  failed: 'Failed',
+};
+
+exports.getAllPayments = async (req, res) => {
+  try {
+    const transactions = await PaymentTransaction.find({})
+      .sort({ createdAt: -1 })
+      .populate('brokerId', 'name')      // get broker name
+      .populate('packageId', 'name key') // get package name and key
+      .lean();
+
+    const payments = [];
+    let totalAmount = 0;
+    let totalPaidAmount = 0;
+    let completedCount = 0;
+    let pendingCount = 0;
+    let failedCount = 0;
+
+    for (const tx of transactions) {
+      const broker = tx.brokerId || {};
+      const pkg = tx.packageId || {};
+
+      const statusLabel = STATUS_LABELS[tx.status] || 'Pending';
+
+      // amount stats
+      totalAmount += tx.amount || 0;
+      if (tx.status === 'paid') {
+        totalPaidAmount += tx.amount || 0;
+        completedCount += 1;
+      } else if (tx.status === 'created') {
+        pendingCount += 1;
+      } else if (tx.status === 'failed') {
+        failedCount += 1;
+      }
+
+      payments.push({
+        id: tx._id,
+        invoice: tx.orderId,                // using Razorpay order id as invoice
+        broker: broker.name || 'Unknown',
+        brokerId: broker._id || null,
+        package: pkg.name || 'Unknown',
+        packageKey: pkg.key || null,
+        amount: tx.amount,
+        currency: tx.currency || 'INR',
+        date: tx.createdAt,
+        status: statusLabel,                // Completed | Pending | Failed
+        method: 'Razorpay',                 // no field in model, so constant for now
+      });
+    }
+
+    return res.json({
+      success: true,
+      data: payments,
+      stats: {
+        totalAmount,
+        totalPaidAmount,
+        completedCount,
+        pendingCount,
+        failedCount,
+      },
+    });
+  } catch (err) {
+    console.error('Error fetching payments', err);
+    return res.status(500).json({
+      success: false,
+      message: 'Failed to fetch payments',
+      error: err.message,
+    });
+  }
+};

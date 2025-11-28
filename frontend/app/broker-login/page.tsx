@@ -26,6 +26,9 @@ export default function BrokerAuth() {
   const [serviceAreas, setServiceAreas] = useState<string[]>([""]);
   const [availableFlatTypes, setAvailableFlatTypes] = useState<string[]>([""]);
   const [address, setAddress] = useState("");
+
+const [monthlyFlatsAvailable, setMonthlyFlatsAvailable] = useState("");
+const [customerExpectations, setCustomerExpectations] = useState("");
   
   const [message, setMessage] = useState("");
   const baseUrl = process.env.NEXT_PUBLIC_BASE_URL || "http://localhost:7000";
@@ -107,6 +110,10 @@ export default function BrokerAuth() {
       serviceAreas: serviceAreas.filter(s => s.trim() !== ""),
       availableFlatTypes: availableFlatTypes.filter(f => f.trim() !== ""),
       address,
+       monthlyFlatsAvailable: monthlyFlatsAvailable
+      ? Number(monthlyFlatsAvailable)
+      : undefined,
+    customerExpectations: customerExpectations || undefined,
     };
 
     try {
@@ -299,7 +306,7 @@ export default function BrokerAuth() {
                     </button>
                   </div>
                 ) : (
-                  <div className="space-y-4 text-black ">
+                  <div className="space-y-4">
                     <div>
                       <label className="block text-sm font-medium text-gray-700 mb-2">
                         Enter OTP
@@ -455,6 +462,34 @@ export default function BrokerAuth() {
                       rows={3}
                     />
                   </div>
+
+                  <div>
+  <label className="block text-sm font-medium text-gray-700 mb-2">
+    No. of flats available per month (optional)
+  </label>
+  <input
+    type="number"
+    min={0}
+    value={monthlyFlatsAvailable}
+    onChange={e => setMonthlyFlatsAvailable(e.target.value)}
+    placeholder="e.g., 10"
+    className="w-full px-4 py-3 border-2 border-gray-200 rounded-xl focus:border-blue-500 focus:outline-none transition-colors"
+  />
+</div>
+
+<div>
+  <label className="block text-sm font-medium text-gray-700 mb-2">
+    Expectations from customers (optional)
+  </label>
+  <textarea
+    value={customerExpectations}
+    onChange={e => setCustomerExpectations(e.target.value)}
+    placeholder="Any notes or conditions you expect from tenants"
+    className="w-full px-4 py-3 border-2 border-gray-200 rounded-xl focus:border-blue-500 focus:outline-none transition-colors"
+    rows={3}
+  />
+</div>
+
 
                   <button
                     onClick={handleSignup}

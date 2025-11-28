@@ -7,6 +7,10 @@ const BrokerSchema = new mongoose.Schema(
     serviceAreas: { type: [String], default: [] },
     availableFlatTypes: { type: [String], default: [] },
     address: { type: String, trim: true },
+
+    monthlyFlatsAvailable: { type: Number, default: 0 },          // optional
+    customerExpectations: { type: String, trim: true },           // optional
+
     otpCode: { type: String },
     otpExpires: { type: Date },
     paymentIds: {
