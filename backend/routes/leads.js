@@ -1,11 +1,19 @@
 var express = require('express');
 var router = express.Router();
-const { createLead, addRemark, updateStatus, revealContactDetails, getAllLeadsForAdmin } = require('../controllers/leadsController');
+const { createLead, addRemark, updateStatus, revealContactDetails, getAllLeadsForAdmin, bulkCreateLeads } = require('../controllers/leadsController');
+const multer = require('multer');
+const upload = multer(); // uses memory storage
 
 router.get('/admin/all', getAllLeadsForAdmin);
 router.post('/', createLead);
 router.put('/:leadId/remark', addRemark);
 router.put('/:leadId/status', updateStatus);
 router.put('/:leadId/reveal', revealContactDetails);
+
+router.post(
+  '/bulk-upload',
+  upload.single('file'),
+ bulkCreateLeads
+);
 
 module.exports = router;

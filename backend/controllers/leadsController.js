@@ -2,6 +2,9 @@ const Lead = require('../models/Lead');
 const Broker = require('../models/Broker');
 const AssignmentCursor = require('../models/AssignmentCursor');
 
+const XLSX = require('xlsx');        // for Excel parsing
+const multer = require('multer'); 
+
 // exports.createLead = async (req, res, next) => {
 //   try {
 //     const { name, phoneNumber, address, budget, flatType, remark } = req.body;
@@ -303,6 +306,400 @@ exports.getAllLeadsForAdmin = async (req, res, next) => {
         hasMore: hasMore
       },
       data: leads
+    });
+  } catch (err) {
+    next(err);
+  }
+};
+
+function normalizeExcelPhone(raw) {
+  if (raw === undefined || raw === null) return '';
+
+  let str;
+
+  // if Excel gave a number (like 9876543210 or 9.87654321e9)
+  if (typeof raw === 'number') {
+    str = String(Math.trunc(raw));
+  } else {
+    str = String(raw).trim();
+  }
+
+  // if already starts with "+"
+  if (str.startsWith('+')) {
+    const digits = str.replace(/\D/g, '');
+    if (digits.length >= 10) {
+      return '+' + digits; // e.g. "+919876543210"
+    }
+    return str;
+  }
+
+  // keep only digits
+  const digits = str.replace(/\D/g, '');
+
+  // 10 digits: assume Indian mobile
+  if (digits.length === 10) {
+    return '+91' + digits;
+  }
+
+  // 12 digits and starts with 91: assume +91XXXXXXXXXX
+  if (digits.length === 12 && digits.startsWith('91')) {
+    return '+' + digits;
+  }
+
+  // fallback: if something is there, at least prefix "+"
+  return digits ? '+' + digits : '';
+}
+
+
+// async function createLeadForBulk(payload) {
+//   const { name, phoneNumber, address, budget, flatType, remark, areaKey } = payload;
+
+//   if (!name || !phoneNumber) {
+//     throw new Error('name and phoneNumber are required');
+//   }
+
+//   let resolvedAreaKey = areaKey || null;
+//   let matchedBrokers = [];
+
+//   if (resolvedAreaKey) {
+//     const areaLower = resolvedAreaKey.toLowerCase();
+
+//     const brokers = await Broker.find({ serviceAreas: { $exists: true, $ne: [] } })
+//       .populate('currentPackage')
+//       .lean();
+
+//     matchedBrokers = brokers.filter((b) =>
+//       (b.serviceAreas || []).some((a) => areaLower === String(a).toLowerCase())
+//     );
+
+//     matchedBrokers = matchedBrokers.filter((b) => {
+//       if (!b.currentPackage) return false;
+//       const leadsAssigned = b.leadsAssigned || 0;
+//       const leadsCount = b.currentPackage.leadsCount || 0;
+//       return leadsAssigned < leadsCount;
+//     });
+//   } else if (address) {
+//     const addrLower = address.toLowerCase();
+//     const brokers = await Broker.find({ serviceAreas: { $exists: true, $ne: [] } })
+//       .populate('currentPackage')
+//       .lean();
+
+//     matchedBrokers = brokers.filter((b) =>
+//       (b.serviceAreas || []).some((a) => addrLower.includes(String(a).toLowerCase()))
+//     );
+
+//     matchedBrokers = matchedBrokers.filter((b) => {
+//       if (!b.currentPackage) return false;
+//       const leadsAssigned = b.leadsAssigned || 0;
+//       const leadsCount = b.currentPackage.leadsCount || 0;
+//       return leadsAssigned < leadsCount;
+//     });
+
+//     if (matchedBrokers.length) {
+//       const areas = matchedBrokers.flatMap((b) => b.serviceAreas || []);
+//       resolvedAreaKey =
+//         areas.find((a) => addrLower.includes(String(a).toLowerCase())) || null;
+//     }
+//   }
+
+//   let assignedTo = null;
+//   let assignedAt = null;
+//   let status = 'open';
+
+//   if (matchedBrokers.length) {
+//     const ordered = matchedBrokers.sort((a, b) =>
+//       a._id.toString() > b._id.toString() ? 1 : -1
+//     );
+
+//     let nextIndex = 0;
+//     if (resolvedAreaKey) {
+//       const cursor = await AssignmentCursor.findOne({ areaKey: resolvedAreaKey });
+//       if (cursor) {
+//         const lastId = cursor.lastAssignedBroker ? cursor.lastAssignedBroker.toString() : null;
+//         const idx = ordered.findIndex((b) => b._id.toString() === lastId);
+//         nextIndex = idx >= 0 ? (idx + 1) % ordered.length : 0;
+//         cursor.lastAssignedBroker = ordered[nextIndex]._id;
+//         await cursor.save();
+//       } else {
+//         await AssignmentCursor.create({
+//           areaKey: resolvedAreaKey,
+//           lastAssignedBroker: ordered[0]._id,
+//         });
+//         nextIndex = 0;
+//       }
+//     }
+
+//     assignedTo = ordered[nextIndex]._id;
+//     assignedAt = new Date();
+//     status = 'assigned';
+//   }
+
+//   const lead = await Lead.create({
+//     name,
+//     phoneNumber,
+//     address,
+//     budget,
+//     flatType,
+//     status,
+//     areaKey: resolvedAreaKey,
+//     assignedTo,
+//     assignedAt,
+//     remark,
+//   });
+
+//   if (assignedTo) {
+//     await Broker.findByIdAndUpdate(assignedTo, { $inc: { leadsAssigned: 1 } });
+//   }
+
+//   return lead;
+// }
+
+
+// // POST /api/leads/bulk-upload
+// // multipart/form-data, field: "file"
+// exports.bulkCreateLeads = async (req, res, next) => {
+//   try {
+//     if (!req.file) {
+//       return res.status(400).json({ message: 'file is required' });
+//     }
+
+//     // read Excel from buffer
+//     const workbook = XLSX.read(req.file.buffer, { type: 'buffer' });
+//     const sheetName = workbook.SheetNames[0];
+//     const worksheet = workbook.Sheets[sheetName];
+//     const rows = XLSX.utils.sheet_to_json(worksheet, { defval: '' });
+
+//     if (!rows.length) {
+//       return res.status(400).json({ message: 'No rows found in uploaded file' });
+//     }
+
+//     const createdLeads = [];
+//     const errors = [];
+
+//     for (let i = 0; i < rows.length; i++) {
+//       const row = rows[i];
+
+//       const payload = {
+//         name: String(row.name || row.Name || '').trim(),
+//         phoneNumber: String(row.phoneNumber || row.Phone || '').trim(),
+//         address: String(row.address || row.Address || '').trim(),
+//         flatType: String(row.flatType || row.FlatType || '').trim(),
+//         areaKey: String(row.areaKey || row.AreaKey || '').trim(),
+//         remark: String(row.remark || row.Remark || '').trim(),
+//       };
+
+//       // budget numeric
+//       const budgetRaw = row.budget || row.Budget;
+//       if (budgetRaw !== undefined && budgetRaw !== null && budgetRaw !== '') {
+//         const parsed = Number(budgetRaw);
+//         if (!isNaN(parsed)) {
+//           payload.budget = parsed;
+//         }
+//       }
+
+//       try {
+//         const lead = await createLeadForBulk(payload);
+//         createdLeads.push(lead);
+//       } catch (err) {
+//         errors.push({
+//           rowIndex: i + 2, // row 1 is header
+//           error: err.message || 'Unknown error',
+//         });
+//       }
+//     }
+
+//     return res.status(201).json({
+//       success: true,
+//       message: 'Bulk leads processed',
+//       stats: {
+//         totalRows: rows.length,
+//         created: createdLeads.length,
+//         failed: errors.length,
+//       },
+//       data: createdLeads,
+//       errors,
+//     });
+//   } catch (err) {
+//     next(err);
+//   }
+// };
+
+
+async function createLeadForBulk(payload) {
+  const { name, phoneNumber, address, budget, flatType, remark, areaKey } = payload;
+
+  if (!name || !phoneNumber) {
+    throw new Error('name and phoneNumber are required');
+  }
+
+  let resolvedAreaKey = areaKey || null;
+  let matchedBrokers = [];
+
+  if (resolvedAreaKey) {
+    const areaLower = resolvedAreaKey.toLowerCase();
+
+    const brokers = await Broker.find({ serviceAreas: { $exists: true, $ne: [] } })
+      .populate('currentPackage')
+      .lean();
+
+    matchedBrokers = brokers.filter((b) =>
+      (b.serviceAreas || []).some((a) => areaLower === String(a).toLowerCase())
+    );
+
+    matchedBrokers = matchedBrokers.filter((b) => {
+      if (!b.currentPackage) return false;
+      const leadsAssigned = b.leadsAssigned || 0;
+      const leadsCount = b.currentPackage.leadsCount || 0;
+      return leadsAssigned < leadsCount;
+    });
+  } else if (address) {
+    const addrLower = address.toLowerCase();
+    const brokers = await Broker.find({ serviceAreas: { $exists: true, $ne: [] } })
+      .populate('currentPackage')
+      .lean();
+
+    matchedBrokers = brokers.filter((b) =>
+      (b.serviceAreas || []).some((a) => addrLower.includes(String(a).toLowerCase()))
+    );
+
+    matchedBrokers = matchedBrokers.filter((b) => {
+      if (!b.currentPackage) return false;
+      const leadsAssigned = b.leadsAssigned || 0;
+      const leadsCount = b.currentPackage.leadsCount || 0;
+      return leadsAssigned < leadsCount;
+    });
+
+    if (matchedBrokers.length) {
+      const areas = matchedBrokers.flatMap((b) => b.serviceAreas || []);
+      resolvedAreaKey =
+        areas.find((a) => addrLower.includes(String(a).toLowerCase())) || null;
+    }
+  }
+
+  let assignedTo = null;
+  let assignedAt = null;
+  let status = 'open';
+
+  if (matchedBrokers.length) {
+    const ordered = matchedBrokers.sort((a, b) =>
+      a._id.toString() > b._id.toString() ? 1 : -1
+    );
+
+    let nextIndex = 0;
+    if (resolvedAreaKey) {
+      const cursor = await AssignmentCursor.findOne({ areaKey: resolvedAreaKey });
+      if (cursor) {
+        const lastId = cursor.lastAssignedBroker ? cursor.lastAssignedBroker.toString() : null;
+        const idx = ordered.findIndex((b) => b._id.toString() === lastId);
+        nextIndex = idx >= 0 ? (idx + 1) % ordered.length : 0;
+        cursor.lastAssignedBroker = ordered[nextIndex]._id;
+        await cursor.save();
+      } else {
+        await AssignmentCursor.create({
+          areaKey: resolvedAreaKey,
+          lastAssignedBroker: ordered[0]._id,
+        });
+        nextIndex = 0;
+      }
+    }
+
+    assignedTo = ordered[nextIndex]._id;
+    assignedAt = new Date();
+    status = 'assigned';
+  }
+
+  const lead = await Lead.create({
+    name,
+    phoneNumber,
+    address,
+    budget,
+    flatType,
+    status,
+    areaKey: resolvedAreaKey,
+    assignedTo,
+    assignedAt,
+    remark,
+  });
+
+  if (assignedTo) {
+    await Broker.findByIdAndUpdate(assignedTo, { $inc: { leadsAssigned: 1 } });
+  }
+
+  return lead;
+}
+
+
+// POST /api/leads/bulk-upload
+// multipart/form-data, field: "file"
+exports.bulkCreateLeads = async (req, res, next) => {
+  try {
+    if (!req.file) {
+      return res.status(400).json({ message: 'file is required' });
+    }
+
+    // read Excel from buffer
+    const workbook = XLSX.read(req.file.buffer, { type: 'buffer' });
+    const sheetName = workbook.SheetNames[0];
+    const worksheet = workbook.Sheets[sheetName];
+    const rows = XLSX.utils.sheet_to_json(worksheet, { defval: '' });
+
+    if (!rows.length) {
+      return res.status(400).json({ message: 'No rows found in uploaded file' });
+    }
+
+    const createdLeads = [];
+    const errors = [];
+
+    for (let i = 0; i < rows.length; i++) {
+      const row = rows[i];
+
+      // try multiple possible header names for phone
+      const rawPhone =
+        row.phoneNumber ||
+        row.Phone ||
+        row['phone'] ||
+        row['Phone Number'] ||
+        row['phone_number'];
+
+      const payload = {
+        name: String(row.name || row.Name || '').trim(),
+        phoneNumber: normalizeExcelPhone(rawPhone),
+        address: String(row.address || row.Address || '').trim(),
+        flatType: String(row.flatType || row.FlatType || '').trim(),
+        areaKey: String(row.areaKey || row.AreaKey || '').trim(),
+        remark: String(row.remark || row.Remark || '').trim(),
+      };
+
+      // budget numeric
+      const budgetRaw = row.budget || row.Budget;
+      if (budgetRaw !== undefined && budgetRaw !== null && budgetRaw !== '') {
+        const parsed = Number(budgetRaw);
+        if (!isNaN(parsed)) {
+          payload.budget = parsed;
+        }
+      }
+
+      try {
+        const lead = await createLeadForBulk(payload);
+        createdLeads.push(lead);
+      } catch (err) {
+        errors.push({
+          rowIndex: i + 2, // row 1 is header
+          error: err.message || 'Unknown error',
+        });
+      }
+    }
+
+    return res.status(201).json({
+      success: true,
+      message: 'Bulk leads processed',
+      stats: {
+        totalRows: rows.length,
+        created: createdLeads.length,
+        failed: errors.length,
+      },
+      data: createdLeads,
+      errors,
     });
   } catch (err) {
     next(err);
