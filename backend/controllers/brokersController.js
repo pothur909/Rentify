@@ -51,14 +51,24 @@ exports.requestOtp = async (req, res, next) => {
       return res.status(404).json({ message: 'Broker not found. Please sign up first.' });
     }
 
-    const otp = Math.floor(100000 + Math.random() * 900000).toString();
-    const expires = new Date(Date.now() + 5 * 60 * 1000); // 5 minutes
+    // const otp = Math.floor(100000 + Math.random() * 900000).toString();
+    // const expires = new Date(Date.now() + 5 * 60 * 1000); // 5 minutes
 
-    broker.otpCode = otp;
-    broker.otpExpires = expires;
-    await broker.save();
+    // broker.otpCode = otp;
+    // broker.otpExpires = expires;
+    // await broker.save();
 
-    console.log(`OTP for ${phoneNumber}: ${otp} (expires at ${expires.toISOString()})`);
+    // console.log(`OTP for ${phoneNumber}: ${otp} (expires at ${expires.toISOString()})`);
+
+ const otp = "999999";  // hardcoded OTP for dev
+const expires = new Date(Date.now() + 60 * 60 * 1000); // 1 hour, or whatever you want
+
+broker.otpCode = otp;
+broker.otpExpires = expires;
+await broker.save();
+
+console.log(`OTP for ${phoneNumber}: ${otp} (expires at ${expires.toISOString()})`);
+
 
     return res.json({ message: 'OTP sent (check server logs in this demo)' });
   } catch (err) {
@@ -106,9 +116,11 @@ exports.verifyOtp = async (req, res) => {
   try {
     const { phoneNumber, otp } = req.body;
 
-    if (!phoneNumber || !otp) {
-      return res.status(400).json({ success: false, message: "Phone number and OTP are required" });
-    }
+    // if (!phoneNumber || !otp) {
+    //   return res.status(400).json({ success: false, message: "Phone number and OTP are required" });
+    // }
+
+    
 
     // Ensure +91 prefix
     const formattedPhone = phoneNumber.startsWith("+") ? phoneNumber : `+91${phoneNumber}`;
@@ -118,18 +130,24 @@ exports.verifyOtp = async (req, res) => {
       return res.status(400).json({ success: false, message: "OTP not requested or invalid" });
     }
 
-    if (broker.otpExpires < new Date()) {
-      return res.status(400).json({ success: false, message: "OTP expired" });
-    }
+    // if (broker.otpExpires < new Date()) {
+    //   return res.status(400).json({ success: false, message: "OTP expired" });
+    // }
 
-    if (broker.otpCode !== otp) {
+    // if (broker.otpCode !== otp) {
+    //   return res.status(400).json({ success: false, message: "Invalid OTP" });
+    // }
+
+    // // Clear OTP
+    // broker.otpCode = undefined;
+    // broker.otpExpires = undefined;
+    // await broker.save();
+
+      // HARD CODED OTP CHECK
+    if (otp !== "999999") {
       return res.status(400).json({ success: false, message: "Invalid OTP" });
     }
 
-    // Clear OTP
-    broker.otpCode = undefined;
-    broker.otpExpires = undefined;
-    await broker.save();
 
     // Generate JWT
     const token = jwt.sign({ brokerId: broker._id }, JWT_SECRET, { expiresIn: "7d" });
