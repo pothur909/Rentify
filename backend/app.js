@@ -16,6 +16,7 @@ const leadPackageRouter = require('./routes/leadPackage.routes');
 
 
 var packagesRouter = require('./routes/packages');
+var subAdminsRouter = require('./routes/subAdmins');
 const cors = require('cors');
 
 var app = express();
@@ -91,6 +92,7 @@ app.use('/api/brokers', brokersRouter);
 app.use('/api/payments', razorPaymentRouter);
 app.use('/api/lead-packages', leadPackageRouter);
 app.use('/api/packages', packagesRouter);
+app.use('/api/sub-admins', subAdminsRouter);
 
 // catch 404 and forward to error handler
 app.use(function(req, res, next) {

@@ -3,6 +3,7 @@ const Lead = require('../models/Lead');
 const Package = require('../models/Package');
 const jwt = require('jsonwebtoken');
 const JWT_SECRET = process.env.JWT_SECRET || "secret";
+const PaymentTransaction = require('../models/PaymentTransaction'); 
 
 exports.signup = async (req, res, next) => {
   try {
@@ -301,3 +302,164 @@ exports.getAllBrokersForAdmin = async (req, res, next) => {
   }
 };
 
+
+
+// exports.getBrokerDashboardStats = async (req, res, next) => {
+//   try {
+//     const { brokerId } = req.params;
+
+//     if (!brokerId) {
+//       return res.status(400).json({ message: 'brokerId is required' });
+//     }
+
+//     // find broker and populate current package
+//     const broker = await Broker.findById(brokerId).populate('currentPackage');
+//     if (!broker) {
+//       return res.status(404).json({ message: 'Broker not found' });
+//     }
+
+//     // lead stats
+//     const totalLeads = await Lead.countDocuments({ assignedTo: brokerId });
+//     const contactedLeads = await Lead.countDocuments({
+//       assignedTo: brokerId,
+//       status: 'contacted',
+//     });
+//     const closedLeads = await Lead.countDocuments({
+//       assignedTo: brokerId,
+//       status: 'closed',
+//     });
+
+//     // "upcoming" = assigned but not contacted/closed
+// const upcomingLeads = Math.max(
+//   totalLeads - contactedLeads - closedLeads,
+//   0
+// );
+
+//     // package stats from payment transactions
+//     const totalPackagesPurchased = await PaymentTransaction.countDocuments({
+//       brokerId,
+//       status: 'paid',
+//     });
+
+//     const lastPaidTxn = await PaymentTransaction.findOne({
+//       brokerId,
+//       status: 'paid',
+//     })
+//       .sort({ paidAt: -1 })
+//       .populate('packageId', 'name leadsCount price durationLabel');
+
+//     return res.json({
+//       message: 'Dashboard stats fetched successfully',
+//       data: {
+//         broker: {
+//           id: broker._id,
+//           name: broker.name,
+//           phoneNumber: broker.phoneNumber,
+//         },
+//         leads: {
+//           total: totalLeads,
+//           contacted: contactedLeads,
+//           closed: closedLeads,
+//           upcoming: upcomingLeads,
+//         },
+//         package: {
+//           current: broker.currentPackage
+//             ? {
+//                 id: broker.currentPackage._id,
+//                 name: broker.currentPackage.name,
+//                 leadsCount: broker.currentPackage.leadsCount,
+//                 price: broker.currentPackage.price,
+//                 durationLabel: broker.currentPackage.durationLabel,
+//                 purchasedAt: broker.packagePurchasedAt || null,
+//                 leadsAssigned: broker.leadsAssigned || 0,
+//                 leadsRemaining: broker.currentPackage.leadsCount
+//                   ? Math.max(
+//                       broker.currentPackage.leadsCount - (broker.leadsAssigned || 0),
+//                       0
+//                     )
+//                   : 0,
+//               }
+//             : null,
+//           totalPurchased: totalPackagesPurchased,
+//           lastPurchase: lastPaidTxn
+//             ? {
+//                 id: lastPaidTxn._id,
+//                 packageId: lastPaidTxn.packageId?._id,
+//                 packageName: lastPaidTxn.packageId?.name,
+//                 amount: lastPaidTxn.amount,
+//                 currency: lastPaidTxn.currency,
+//                 paidAt: lastPaidTxn.paidAt,
+//               }
+//             : null,
+//         },
+//       },
+//     });
+//   } catch (err) {
+//     next(err);
+//   }
+// };
+
+
+exports.getBrokerDashboardStats = async (req, res, next) => {
+  try {
+    const { brokerId } = req.params;
+
+    if (!brokerId) {
+      return res.status(400).json({ message: 'brokerId is required' });
+    }
+
+    const broker = await Broker.findById(brokerId).populate('currentPackage');
+
+    if (!broker) {
+      return res.status(404).json({ message: 'Broker not found' });
+    }
+
+    // counts in parallel
+    const [contactedLeads, closedLeads, totalAssignedLeads, totalPaidPackages] =
+      await Promise.all([
+        Lead.countDocuments({ assignedTo: brokerId, status: 'contacted' }),
+        Lead.countDocuments({ assignedTo: brokerId, status: 'closed' }),
+        Lead.countDocuments({ assignedTo: brokerId }), // all leads assigned to this broker
+        PaymentTransaction.countDocuments({
+          brokerId,
+          status: 'paid',
+        }),
+      ]);
+
+    // package stats
+    const leadLimit = broker.currentPackage
+      ? broker.currentPackage.leadsCount || 0
+      : 0;
+
+    const leadsAssigned = broker.leadsAssigned || 0;
+
+    // upcoming = remaining capacity from package
+    const remainingCapacity = Math.max(leadLimit - leadsAssigned, 0);
+
+    return res.json({
+      message: 'Dashboard stats fetched successfully',
+      data: {
+        broker: {
+          _id: broker._id,
+          name: broker.name,
+          phoneNumber: broker.phoneNumber,
+        },
+        leads: {
+          // these are real lead counts in DB
+          contacted: contactedLeads,
+          closed: closedLeads,
+          assigned: totalAssignedLeads,
+        },
+        package: {
+          hasActivePackage: !!broker.currentPackage,
+          leadLimit,                 // this is your "total leads" for UI
+          leadsAssigned,             // how many already assigned
+          remainingCapacity,         // this is your "upcoming" for UI
+          totalPurchased: totalPaidPackages,
+        },
+      },
+    });
+  } catch (err) {
+    next(err);
+  }
+};
