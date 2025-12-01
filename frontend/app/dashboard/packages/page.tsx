@@ -398,7 +398,7 @@ export default function PackagesPage() {
   const [isMobileMenuOpen, setIsMobileMenuOpen] = useState(false);
 
   const API_BASE =
-    process.env.NEXT_PUBLIC_API_BASE_URL || "http://localhost:7000";
+    process.env.NEXT_PUBLIC_BASE_URL || "http://localhost:7000";
 
   useEffect(() => {
     const fetchPackages = async () => {

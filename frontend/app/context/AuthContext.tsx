@@ -7,6 +7,17 @@ interface Broker {
   _id: string;
   name: string;
   phoneNumber: string;
+
+ email?: string;
+  address?: string;
+  experience?: string;
+  specialization?: string;
+   joinDate?: string;
+
+  // Add any new optional fields you added in backend
+  flatsAvailablePerMonth?: number;
+  expectationsNote?: string;
+   token?: string;
 }
 
 interface AuthContextType {
