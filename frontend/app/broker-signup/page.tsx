@@ -546,6 +546,7 @@ import {
   User,
   MapPin,
   CheckCircle,
+  Search,
 } from "lucide-react";
 
 const SERVICE_AREAS = [
@@ -586,6 +587,14 @@ export default function BrokerAuth() {
   const [address, setAddress] = useState("");
   const [monthlyFlatsAvailable, setMonthlyFlatsAvailable] = useState("");
   const [customerExpectations, setCustomerExpectations] = useState("");
+
+  // Location autocomplete states for each service area
+  const [areaSearchTerms, setAreaSearchTerms] = useState<string[]>([""]);  
+  const [areaShowSuggestions, setAreaShowSuggestions] = useState<boolean[]>([false]);
+  const [areaLocationSuggestions, setAreaLocationSuggestions] = useState<Array<Array<{display_name: string; area_name: string; lat: string; lon: string; is_base_area: boolean}>>>([[]]);
+  const [areaIsSearching, setAreaIsSearching] = useState<boolean[]>([false]);
+  const [areaSelectedBase, setAreaSelectedBase] = useState<Array<string | null>>([null]);
+  const [areaShowSubLocations, setAreaShowSubLocations] = useState<boolean[]>([false]);
 
   const [message, setMessage] = useState("");
   const baseUrl = process.env.NEXT_PUBLIC_BASE_URL || "http://localhost:7000";
@@ -735,8 +744,232 @@ export default function BrokerAuth() {
     setAvailableFlatTypes(updated);
   };
 
-  const addServiceArea = () => setServiceAreas((prev) => [...prev, ""]);
+  const addServiceArea = () => {
+    setServiceAreas((prev) => [...prev, ""]);
+    setAreaSearchTerms((prev) => [...prev, ""]);
+    setAreaShowSuggestions((prev) => [...prev, false]);
+    setAreaLocationSuggestions((prev) => [...prev, []]);
+    setAreaIsSearching((prev) => [...prev, false]);
+    setAreaSelectedBase((prev) => [...prev, null]);
+    setAreaShowSubLocations((prev) => [...prev, false]);
+  };
   const addFlatType = () => setAvailableFlatTypes((prev) => [...prev, ""]);
+
+  // Helper function to extract area name from address (same as enquiry form)
+  const extractAreaName = (displayName: string, address: any): string => {
+    const parts = displayName.split(',').map(p => p.trim());
+    const genericTerms = [
+      'bangalore', 'bengaluru', 'karnataka', 'india',
+      'bangalore urban', 'bengaluru urban', 'bangalore south', 'bengaluru south',
+      'south city corporation', 'bengaluru south city corporation',
+      'new tavarekere', 'tavarekere'
+    ];
+    const isGeneric = (part: string): boolean => {
+      const lower = part.toLowerCase();
+      return genericTerms.some(term => lower.includes(term)) || /^\d{6}$/.test(part.trim());
+    };
+    const hasSpecificInfo = (str: string): boolean => {
+      const lower = str.toLowerCase();
+      return /\b(sector|block|phase|stage)\b/i.test(lower);
+    };
+    const isRoadName = (str: string): boolean => {
+      const lower = str.toLowerCase();
+      return /\b(road|street|cross|main|avenue|lane)\b/i.test(lower) && !hasSpecificInfo(str);
+    };
+    const isBusinessName = (str: string): boolean => {
+      if (hasSpecificInfo(str)) return false;
+      const businessIndicators = /\b(labs|pvt|ltd|bank|atm|hospital|school|mall|tower|plaza|complex|apartment|building)\b/i;
+      return businessIndicators.test(str);
+    };
+    const meaningful: string[] = [];
+    for (const part of parts) {
+      if (isGeneric(part)) continue;
+      if (isRoadName(part) || isBusinessName(part)) continue;
+      if (/^\d+$/.test(part.trim())) continue;
+      meaningful.push(part);
+      if (meaningful.length >= 2 && hasSpecificInfo(meaningful[meaningful.length - 1])) {
+        break;
+      }
+      if (meaningful.length === 1 && hasSpecificInfo(meaningful[0])) {
+        continue;
+      }
+      if (meaningful.length >= 2) {
+        break;
+      }
+    }
+    if (meaningful.length > 0) {
+      return meaningful.join(' ');
+    }
+    return parts[0] || displayName;
+  };
+
+  const isBaseArea = (areaName: string): boolean => {
+    const lower = areaName.toLowerCase();
+    return !/\b(sector|block|phase|stage)\b/.test(lower);
+  };
+
+  const fetchSubLocations = async (baseArea: string, index: number) => {
+    const updatedSearching = [...areaIsSearching];
+    updatedSearching[index] = true;
+    setAreaIsSearching(updatedSearching);
+    
+    try {
+      const response = await fetch(
+        `https://nominatim.openstreetmap.org/search?` +
+        `q=${encodeURIComponent(baseArea)},Bangalore,India&` +
+        `format=json&` +
+        `limit=20&` +
+        `addressdetails=1`,
+        {
+          headers: {
+            'User-Agent': 'Rentify-App',
+          },
+        }
+      );
+      
+      if (response.ok) {
+        const data = await response.json();
+        const subLocs = data
+          .map((item: any) => ({
+            display_name: item.display_name,
+            area_name: extractAreaName(item.display_name, item.address),
+            lat: item.lat,
+            lon: item.lon,
+            is_base_area: false,
+          }))
+          .filter((loc: any) => !isBaseArea(loc.area_name));
+        
+        const updatedSuggestions = [...areaLocationSuggestions];
+        updatedSuggestions[index] = subLocs;
+        setAreaLocationSuggestions(updatedSuggestions);
+        
+        const updatedShowSub = [...areaShowSubLocations];
+        updatedShowSub[index] = true;
+        setAreaShowSubLocations(updatedShowSub);
+      }
+    } catch (error) {
+      console.error('Error fetching sub-locations:', error);
+    } finally {
+      const updatedSearching = [...areaIsSearching];
+      updatedSearching[index] = false;
+      setAreaIsSearching(updatedSearching);
+    }
+  };
+
+  const handleAreaSearch = async (index: number, searchTerm: string) => {
+    const updatedTerms = [...areaSearchTerms];
+    updatedTerms[index] = searchTerm;
+    setAreaSearchTerms(updatedTerms);
+
+    const updatedShow = [...areaShowSuggestions];
+    updatedShow[index] = true;
+    setAreaShowSuggestions(updatedShow);
+
+    if (!searchTerm || searchTerm.length < 3) {
+      const updatedSuggestions = [...areaLocationSuggestions];
+      updatedSuggestions[index] = [];
+      setAreaLocationSuggestions(updatedSuggestions);
+      
+      const updatedShowSub = [...areaShowSubLocations];
+      updatedShowSub[index] = false;
+      setAreaShowSubLocations(updatedShowSub);
+      
+      const updatedBase = [...areaSelectedBase];
+      updatedBase[index] = null;
+      setAreaSelectedBase(updatedBase);
+      return;
+    }
+
+    const updatedSearching = [...areaIsSearching];
+    updatedSearching[index] = true;
+    setAreaIsSearching(updatedSearching);
+
+    const updatedShowSub = [...areaShowSubLocations];
+    updatedShowSub[index] = false;
+    setAreaShowSubLocations(updatedShowSub);
+
+    const updatedBase = [...areaSelectedBase];
+    updatedBase[index] = null;
+    setAreaSelectedBase(updatedBase);
+
+    try {
+      const response = await fetch(
+        `https://nominatim.openstreetmap.org/search?` +
+        `q=${encodeURIComponent(searchTerm)},Bangalore,India&` +
+        `format=json&` +
+        `limit=8&` +
+        `addressdetails=1`,
+        {
+          headers: {
+            'User-Agent': 'Rentify-App',
+          },
+        }
+      );
+      
+      if (response.ok) {
+        const data = await response.json();
+        const processedData = data.map((item: any) => {
+          const areaName = extractAreaName(item.display_name, item.address);
+          return {
+            display_name: item.display_name,
+            area_name: areaName,
+            lat: item.lat,
+            lon: item.lon,
+            is_base_area: isBaseArea(areaName),
+          };
+        });
+        const updatedSuggestions = [...areaLocationSuggestions];
+        updatedSuggestions[index] = processedData;
+        setAreaLocationSuggestions(updatedSuggestions);
+      }
+    } catch (error) {
+      console.error('Error fetching location suggestions:', error);
+    } finally {
+      const updatedSearching = [...areaIsSearching];
+      updatedSearching[index] = false;
+      setAreaIsSearching(updatedSearching);
+    }
+  };
+
+  const handleAreaSelect = (index: number, location: {display_name: string; area_name: string; lat: string; lon: string; is_base_area: boolean}) => {
+    if (location.is_base_area) {
+      const updatedBase = [...areaSelectedBase];
+      updatedBase[index] = location.area_name;
+      setAreaSelectedBase(updatedBase);
+      
+      const updatedTerms = [...areaSearchTerms];
+      updatedTerms[index] = location.area_name;
+      setAreaSearchTerms(updatedTerms);
+      
+      fetchSubLocations(location.area_name, index);
+      return;
+    }
+    
+    const updated = [...serviceAreas];
+    updated[index] = location.area_name;
+    setServiceAreas(updated);
+    
+    // Clear suggestions first
+    const updatedSuggestions = [...areaLocationSuggestions];
+    updatedSuggestions[index] = [];
+    setAreaLocationSuggestions(updatedSuggestions);
+    
+    const updatedTerms = [...areaSearchTerms];
+    updatedTerms[index] = location.area_name;
+    setAreaSearchTerms(updatedTerms);
+    
+    const updatedShow = [...areaShowSuggestions];
+    updatedShow[index] = false; // Close dropdown
+    setAreaShowSuggestions(updatedShow);
+    
+    const updatedShowSub = [...areaShowSubLocations];
+    updatedShowSub[index] = false;
+    setAreaShowSubLocations(updatedShowSub);
+    
+    const updatedBase = [...areaSelectedBase];
+    updatedBase[index] = null;
+    setAreaSelectedBase(updatedBase);
+  };
 
   const FloatingElement = ({ delay = 0, duration = 3 }) => (
     <div
@@ -1053,27 +1286,75 @@ export default function BrokerAuth() {
                     </div>
                   </div>
 
-                  {/* Service areas with dropdowns */}
+                  {/* Service areas with Nominatim autocomplete */}
                   <div>
                     <label className="block text-xs md:text-sm font-medium text-gray-700 mb-2">
                       Service Areas
                     </label>
                     {serviceAreas.map((area, i) => (
-                      <div key={i} className="mb-2">
-                        <select
-                          value={area}
-                          onChange={(e) =>
-                            handleServiceAreaChange(i, e.target.value)
-                          }
-                          className="w-full px-3 md:px-4 py-2.5 md:py-3 border-2 border-gray-200 rounded-xl focus:border-blue-500 focus:outline-none transition-colors text-sm md:text-base bg-white"
-                        >
-                          <option value="">Select area</option>
-                          {SERVICE_AREAS.map((opt) => (
-                            <option key={opt} value={opt}>
-                              {opt}
-                            </option>
-                          ))}
-                        </select>
+                      <div key={i} className="mb-2 relative">
+                        <div className="relative">
+                          <Search className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-400 w-4 h-4 md:w-5 md:h-5" />
+                          <input
+                            type="text"
+                            value={areaSearchTerms[i] || ''}
+                            onChange={(e) => handleAreaSearch(i, e.target.value)}
+                            onFocus={() => {
+                              const updatedShow = [...areaShowSuggestions];
+                              updatedShow[i] = true;
+                              setAreaShowSuggestions(updatedShow);
+                            }}
+                            placeholder="Search location (e.g., HSR Layout)"
+                            className="w-full pl-10 pr-4 py-2.5 md:py-3 border-2 border-gray-200 rounded-xl focus:border-blue-500 focus:outline-none transition-colors text-sm md:text-base"
+                          />
+                          
+                          {areaShowSuggestions[i] && ((areaSearchTerms[i]?.length || 0) >= 3 || areaLocationSuggestions[i]?.length > 0) && (
+                            <div className="absolute z-10 w-full mt-2 bg-white border-2 border-gray-200 rounded-xl shadow-xl max-h-64 overflow-y-auto text-sm">
+                              {areaIsSearching[i] ? (
+                                <div className="px-4 py-3 text-center text-gray-500">
+                                  <div className="inline-block w-4 h-4 border-2 border-blue-600 border-t-transparent rounded-full animate-spin mr-2"></div>
+                                  {areaShowSubLocations[i] ? 'Loading sectors...' : 'Searching locations...'}
+                                </div>
+                              ) : areaLocationSuggestions[i]?.length > 0 ? (
+                                <>
+                                  {areaShowSubLocations[i] && areaSelectedBase[i] && (
+                                    <div className="px-4 py-2 bg-blue-50 border-b-2 border-blue-200 text-blue-700 font-semibold text-xs">
+                                      Select a sector/stage in {areaSelectedBase[i]}
+                                    </div>
+                                  )}
+                                  {areaLocationSuggestions[i].map((location, idx) => (
+                                    <button
+                                      key={idx}
+                                      type="button"
+                                      onClick={() => handleAreaSelect(i, location)}
+                                      className="w-full text-left px-4 py-2.5 hover:bg-blue-50 active:scale-[0.99] transition-all border-b border-gray-100 last:border-b-0 text-black"
+                                    >
+                                      <div className="flex items-start justify-between gap-2">
+                                        <div className="flex items-start flex-1 min-w-0">
+                                          <MapPin className="w-4 h-4 mr-2 text-blue-600 flex-shrink-0 mt-0.5" />
+                                          <span className="text-sm leading-relaxed break-words">{location.area_name}</span>
+                                        </div>
+                                        {location.is_base_area && (
+                                          <svg className="w-4 h-4 text-gray-400 flex-shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 5l7 7-7 7" />
+                                          </svg>
+                                        )}
+                                      </div>
+                                    </button>
+                                  ))}
+                                </>
+                              ) : (areaSearchTerms[i]?.length || 0) >= 3 ? (
+                                <div className="px-4 py-3 text-center text-gray-500">
+                                  No locations found. Try a different search term.
+                                </div>
+                              ) : (
+                                <div className="px-4 py-3 text-center text-gray-500">
+                                  Type at least 3 characters to search
+                                </div>
+                              )}
+                            </div>
+                          )}
+                        </div>
                       </div>
                     ))}
                     <button

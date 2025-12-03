@@ -120,8 +120,6 @@ exports.verifyOtp = async (req, res) => {
     //   return res.status(400).json({ success: false, message: "Phone number and OTP are required" });
     // }
 
-    
-
     // Ensure +91 prefix
     const formattedPhone = phoneNumber.startsWith("+") ? phoneNumber : `+91${phoneNumber}`;
 
@@ -164,7 +162,8 @@ exports.verifyOtp = async (req, res) => {
         availableFlatTypes: broker.availableFlatTypes,
         address: broker.address,
         monthlyFlatsAvailable: broker.monthlyFlatsAvailable,   // NEW
-        customerExpectations: broker.customerExpectations
+        customerExpectations: broker.customerExpectations,
+         profileImageUrl: broker.profileImageUrl || null,
       }
     });
   } catch (err) {
@@ -172,6 +171,7 @@ exports.verifyOtp = async (req, res) => {
     return res.status(500).json({ success: false, message: "Server error", error: err.message });
   }
 };
+
 
 exports.getAssignedLeads = async (req, res, next) => {
   try {
@@ -196,24 +196,54 @@ exports.getAssignedLeads = async (req, res, next) => {
       ? broker.currentPackage.leadsCount - broker.leadsAssigned 
       : 0;
 
-    return res.json({ 
-      message: 'Assigned leads retrieved successfully',
-      count: leads.length,
-      data: leads.map(lead => {
-        const isContacted = lead.status === 'contacted';
-        return {
-          ...lead.toObject(),
-          name: isContacted ? lead.name : null,
-          phoneNumber: isContacted ? lead.phoneNumber : null
-        };
-      }),
-      packageInfo: broker.currentPackage ? {
+    // return res.json({ 
+    //   message: 'Assigned leads retrieved successfully',
+    //   count: leads.length,
+    //   data: leads.map(lead => {
+    //     const isContacted = lead.status === 'contacted';
+    //     return {
+    //       ...lead.toObject(),
+    //       name: isContacted ? lead.name : null,
+    //       phoneNumber: isContacted ? lead.phoneNumber : null
+    //     };
+    //   }),
+    //   packageInfo: broker.currentPackage ? {
+    //     packageName: broker.currentPackage.name,
+    //     leadLimit: broker.currentPackage.leadLimit,
+    //     leadsAssigned: broker.leadsAssigned,
+    //     leadsRemaining: leadsRemaining
+    //   } : null
+    // });
+
+    return res.json({
+  message: 'Assigned leads retrieved successfully',
+  count: leads.length,
+  data: leads.map(lead => {
+    const plain = lead.toObject();
+    const isContacted = plain.status === 'contacted';
+
+    const history = plain.contactHistory || [];
+    const latestContactHistory =
+      history.length > 0 ? history[history.length - 1] : null;
+
+    return {
+      ...plain,
+      // main masking still depends only on main status
+      name: isContacted ? plain.name : null,
+      phoneNumber: isContacted ? plain.phoneNumber : null,
+      latestContactHistory, // purely extra field
+    };
+  }),
+  packageInfo: broker.currentPackage
+    ? {
         packageName: broker.currentPackage.name,
         leadLimit: broker.currentPackage.leadLimit,
         leadsAssigned: broker.leadsAssigned,
-        leadsRemaining: leadsRemaining
-      } : null
-    });
+        leadsRemaining: leadsRemaining,
+      }
+    : null,
+});
+
   } catch (err) {
     next(err);
   }
