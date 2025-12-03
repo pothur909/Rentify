@@ -1,5 +1,23 @@
 const mongoose = require('mongoose');
 
+const ContactHistorySchema = new mongoose.Schema(
+  {
+    status: {
+      type: String,
+      enum: [
+        'not_reachable',
+        'not_received_call',
+        'contacted',
+        'pending_contacted_not_interested',
+      ],
+      required: true,
+    },
+    note: { type: String, trim: true },
+    createdAt: { type: Date, default: Date.now },
+  },
+  { _id: false }
+);
+
 const LeadSchema = new mongoose.Schema(
   {
     name: { type: String, required: true, trim: true },
@@ -15,6 +33,10 @@ const LeadSchema = new mongoose.Schema(
     assignedTo: { type: mongoose.Schema.Types.ObjectId, ref: 'Broker' },
     assignedAt: { type: Date },
     remark: { type: String, trim: true },
+     contactHistory: {
+      type: [ContactHistorySchema],
+      default: [],
+    },
   },
   { timestamps: true }
 );

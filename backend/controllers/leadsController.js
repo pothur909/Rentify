@@ -1308,3 +1308,59 @@ exports.bulkCreateLeads = async (req, res, next) => {
     next(err);
   }
 };
+
+
+
+const CONTACT_HISTORY_STATUSES = [
+  'not_reachable',
+  'not_received_call',
+  'contacted',
+  'pending_contacted_not_interested',
+];
+
+exports.addContactHistoryEntry = async (req, res, next) => {
+  try {
+    const { leadId } = req.params;
+    const { status, note } = req.body;
+
+    if (!leadId) {
+      return res.status(400).json({ message: 'leadId is required' });
+    }
+
+    if (!status || !CONTACT_HISTORY_STATUSES.includes(status)) {
+      return res.status(400).json({
+        message: `Invalid status. Allowed: ${CONTACT_HISTORY_STATUSES.join(', ')}`,
+      });
+    }
+
+    const lead = await Lead.findById(leadId);
+    if (!lead) {
+      return res.status(404).json({ message: 'Lead not found' });
+    }
+
+    // append only, do not edit or delete old entries
+    lead.contactHistory.push({
+      status,
+      note: note || '',
+      createdAt: new Date(),
+    });
+
+    // DO NOT CHANGE lead.status HERE
+    await lead.save();
+
+    const latest = lead.contactHistory[lead.contactHistory.length - 1];
+
+    return res.json({
+      message: 'Contact history entry added',
+      data: {
+        _id: lead._id,
+        status: lead.status,  // main status unchanged
+        latestContactHistory: latest,
+        contactHistoryCount: lead.contactHistory.length,
+      },
+    });
+  } catch (err) {
+    next(err);
+  }
+};
+

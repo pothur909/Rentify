@@ -11,6 +11,10 @@ const BrokerSchema = new mongoose.Schema(
     monthlyFlatsAvailable: { type: Number, default: 0 },          // optional
     customerExpectations: { type: String, trim: true },           // optional
 
+    // new profile image fields
+    profileImageKey: { type: String, trim: true },
+    profileImageUrl: { type: String, trim: true },
+
     otpCode: { type: String },
     otpExpires: { type: Date },
     paymentIds: {
