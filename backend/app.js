@@ -6,6 +6,7 @@ var cookieParser = require('cookie-parser');
 var logger = require('morgan');
 var mongoose = require('mongoose');
 var { startLeadAssignmentWatcher } = require('./services/leadAssignmentWatcher');
+var { startStaleLeadReassignment } = require('./services/staleLeadReassignment');
 
 var indexRouter = require('./routes/index');
 var usersRouter = require('./routes/users');
@@ -80,6 +81,8 @@ mongoose
     }
     // Start change stream watcher for leads assignment
     startLeadAssignmentWatcher(mongoose.connection);
+    // Start scheduled job for stale lead reassignment
+    startStaleLeadReassignment();
   })
   .catch((err) => {
     console.error('MongoDB connection error:', err.message);

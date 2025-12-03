@@ -591,7 +591,16 @@ export default function EnquiryForm() {
 
   const [searchTerm, setSearchTerm] = useState('');
   const [showSuggestions, setShowSuggestions] = useState(false);
-  const [filteredAreas, setFilteredAreas] = useState<string[]>([]);
+  const [locationSuggestions, setLocationSuggestions] = useState<Array<{
+    display_name: string;
+    area_name: string;
+    lat: string;
+    lon: string;
+    is_base_area: boolean;
+  }>>([]);
+  const [isSearching, setIsSearching] = useState(false);
+  const [selectedBaseArea, setSelectedBaseArea] = useState<string | null>(null);
+  const [showSubLocations, setShowSubLocations] = useState(false);
   const autocompleteRef = useRef<HTMLDivElement>(null);
 
   const toggleAmenity = (amenity: string) => {
@@ -607,15 +616,181 @@ export default function EnquiryForm() {
 };
 
 
-  useEffect(() => {
-    if (searchTerm) {
-      const filtered = SERVICE_AREAS.filter((area) =>
-        area.toLowerCase().includes(searchTerm.toLowerCase())
-      );
-      setFilteredAreas(filtered);
-    } else {
-      setFilteredAreas(SERVICE_AREAS);
+  // Helper function to extract area name from address
+  const extractAreaName = (displayName: string, address: any): string => {
+    // Split the display name by commas
+    const parts = displayName.split(',').map(p => p.trim());
+    
+    // Generic location terms to filter out
+    const genericTerms = [
+      'bangalore', 'bengaluru', 'karnataka', 'india',
+      'bangalore urban', 'bengaluru urban', 'bangalore south', 'bengaluru south',
+      'south city corporation', 'bengaluru south city corporation',
+      'new tavarekere', 'tavarekere'
+    ];
+    
+    // Check if a part is generic
+    const isGeneric = (part: string): boolean => {
+      const lower = part.toLowerCase();
+      return genericTerms.some(term => lower.includes(term)) || /^\d{6}$/.test(part.trim());
+    };
+    
+    // Check if contains sector/block/phase/stage
+    const hasSpecificInfo = (str: string): boolean => {
+      const lower = str.toLowerCase();
+      return /\b(sector|block|phase|stage)\b/i.test(lower);
+    };
+    
+    // Check if it's a road/street name
+    const isRoadName = (str: string): boolean => {
+      const lower = str.toLowerCase();
+      return /\b(road|street|cross|main|avenue|lane)\b/i.test(lower) && !hasSpecificInfo(str);
+    };
+    
+    // Check if it's a business/building name
+    const isBusinessName = (str: string): boolean => {
+      if (hasSpecificInfo(str)) return false;
+      const businessIndicators = /\b(labs|pvt|ltd|bank|atm|hospital|school|mall|tower|plaza|complex|apartment|building)\b/i;
+      return businessIndicators.test(str);
+    };
+    
+    // Extract only area name and sector/stage/block
+    const meaningful: string[] = [];
+    
+    for (const part of parts) {
+      // Skip generic terms
+      if (isGeneric(part)) continue;
+      
+      // Skip roads and business names
+      if (isRoadName(part) || isBusinessName(part)) continue;
+      
+      // Skip building numbers
+      if (/^\d+$/.test(part.trim())) continue;
+      
+      // Add this part
+      meaningful.push(part);
+      
+      // If we have area + stage/sector, we're done
+      if (meaningful.length >= 2 && hasSpecificInfo(meaningful[meaningful.length - 1])) {
+        break;
+      }
+      
+      // If we have just stage/sector (like "1st Stage"), keep going for one more
+      if (meaningful.length === 1 && hasSpecificInfo(meaningful[0])) {
+        continue;
+      }
+      
+      // Stop after 2 meaningful parts
+      if (meaningful.length >= 2) {
+        break;
+      }
     }
+    
+    // Return the result
+    if (meaningful.length > 0) {
+      return meaningful.join(' ');
+    }
+    
+    return parts[0] || displayName;
+  };
+
+  // Check if a location is a base area (no sector/stage info)
+  const isBaseArea = (areaName: string): boolean => {
+    const lower = areaName.toLowerCase();
+    return !/\b(sector|block|phase|stage)\b/.test(lower);
+  };
+
+  // Fetch sub-locations (sectors/stages) for a base area
+  const fetchSubLocations = async (baseArea: string) => {
+    setIsSearching(true);
+    try {
+      const response = await fetch(
+        `https://nominatim.openstreetmap.org/search?` +
+        `q=${encodeURIComponent(baseArea)},Bangalore,India&` +
+        `format=json&` +
+        `limit=20&` +
+        `addressdetails=1`,
+        {
+          headers: {
+            'User-Agent': 'Rentify-App',
+          },
+        }
+      );
+      
+      if (response.ok) {
+        const data = await response.json();
+        // Filter to only show locations with sector/stage info
+        const subLocs = data
+          .map((item: any) => ({
+            display_name: item.display_name,
+            area_name: extractAreaName(item.display_name, item.address),
+            lat: item.lat,
+            lon: item.lon,
+            is_base_area: false,
+          }))
+          .filter((loc: any) => !isBaseArea(loc.area_name));
+        
+        setLocationSuggestions(subLocs);
+        setShowSubLocations(true);
+      }
+    } catch (error) {
+      console.error('Error fetching sub-locations:', error);
+    } finally {
+      setIsSearching(false);
+    }
+  };
+
+  // Debounced search for Nominatim API
+  useEffect(() => {
+    if (!searchTerm || searchTerm.length < 3) {
+      setLocationSuggestions([]);
+      setShowSubLocations(false);
+      setSelectedBaseArea(null);
+      return;
+    }
+
+    const timeoutId = setTimeout(async () => {
+      setIsSearching(true);
+      setShowSubLocations(false);
+      setSelectedBaseArea(null);
+      try {
+        // Nominatim API - free geocoding from OpenStreetMap
+        const response = await fetch(
+          `https://nominatim.openstreetmap.org/search?` +
+          `q=${encodeURIComponent(searchTerm)},Bangalore,India&` +
+          `format=json&` +
+          `limit=8&` +
+          `addressdetails=1`,
+          {
+            headers: {
+              'User-Agent': 'Rentify-App', // Nominatim requires a user agent
+            },
+          }
+        );
+        
+        if (response.ok) {
+          const data = await response.json();
+          // Process data to extract area names
+          const processedData = data.map((item: any) => {
+            const areaName = extractAreaName(item.display_name, item.address);
+            return {
+              display_name: item.display_name,
+              area_name: areaName,
+              lat: item.lat,
+              lon: item.lon,
+              is_base_area: isBaseArea(areaName),
+            };
+          });
+          setLocationSuggestions(processedData);
+        }
+      } catch (error) {
+        console.error('Error fetching location suggestions:', error);
+      } finally {
+        setIsSearching(false);
+      }
+    }, 500); // Debounce for 500ms
+
+    return () => clearTimeout(timeoutId);
   }, [searchTerm]);
 
   useEffect(() => {
@@ -656,14 +831,28 @@ export default function EnquiryForm() {
 };
 
 
-  const handleAreaSelect = (area: string) => {
+  const handleAreaSelect = (location: { display_name: string; area_name: string; lat: string; lon: string; is_base_area: boolean }) => {
+    // If this is a base area (no sector info), fetch sub-locations
+    if (location.is_base_area) {
+      setSelectedBaseArea(location.area_name);
+      setSearchTerm(location.area_name);
+      fetchSubLocations(location.area_name);
+      return;
+    }
+    
+    // Otherwise, select this specific location
     setFormData({
       ...formData,
       address: 'Bangalore',
-      areaKey: area,
+      areaKey: location.area_name,
     });
-    setSearchTerm(area);
-    setShowSuggestions(false);
+    
+    // Clear everything and close dropdown
+    setLocationSuggestions([]); // Clear suggestions first
+    setSearchTerm(location.area_name);
+    setShowSuggestions(false); // Then close dropdown
+    setShowSubLocations(false);
+    setSelectedBaseArea(null);
   };
 
   // const handleSubmit = async () => {
@@ -977,21 +1166,50 @@ export default function EnquiryForm() {
                       required
                     />
 
-                    {showSuggestions && filteredAreas.length > 0 && (
-                      <div className="absolute z-10 w-full mt-2 bg-white border-2 border-gray-200 rounded-xl shadow-xl max-h-48 overflow-y-auto text-sm">
-                        {filteredAreas.map((area, index) => (
-                          <button
-                            key={index}
-                            type="button"
-                            onClick={() => handleAreaSelect(area)}
-                            className="w-full text-left px-4 py-2.5 hover:bg-blue-50 active:scale-[0.99] transition-all border-b border-gray-100 last:border-b-0 text-black"
-                          >
-                            <div className="flex items-center">
-                              <MapPin className="w-4 h-4 mr-2 text-blue-600" />
-                              <span>{area}</span>
-                            </div>
-                          </button>
-                        ))}
+                    {showSuggestions && (searchTerm.length >= 3 || locationSuggestions.length > 0) && (
+                      <div className="absolute z-10 w-full mt-2 bg-white border-2 border-gray-200 rounded-xl shadow-xl max-h-64 overflow-y-auto text-sm">
+                        {isSearching ? (
+                          <div className="px-4 py-3 text-center text-gray-500">
+                            <div className="inline-block w-4 h-4 border-2 border-blue-600 border-t-transparent rounded-full animate-spin mr-2"></div>
+                            {showSubLocations ? 'Loading sectors...' : 'Searching locations...'}
+                          </div>
+                        ) : locationSuggestions.length > 0 ? (
+                          <>
+                            {showSubLocations && selectedBaseArea && (
+                              <div className="px-4 py-2 bg-blue-50 border-b-2 border-blue-200 text-blue-700 font-semibold text-xs">
+                                Select a sector/stage in {selectedBaseArea}
+                              </div>
+                            )}
+                            {locationSuggestions.map((location, index) => (
+                              <button
+                                key={index}
+                                type="button"
+                                onClick={() => handleAreaSelect(location)}
+                                className="w-full text-left px-4 py-2.5 hover:bg-blue-50 active:scale-[0.99] transition-all border-b border-gray-100 last:border-b-0 text-black"
+                              >
+                                <div className="flex items-start justify-between gap-2">
+                                  <div className="flex items-start flex-1 min-w-0">
+                                    <MapPin className="w-4 h-4 mr-2 text-blue-600 flex-shrink-0 mt-0.5" />
+                                    <span className="text-sm leading-relaxed break-words">{location.area_name}</span>
+                                  </div>
+                                  {location.is_base_area && (
+                                    <svg className="w-4 h-4 text-gray-400 flex-shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 5l7 7-7 7" />
+                                    </svg>
+                                  )}
+                                </div>
+                              </button>
+                            ))}
+                          </>
+                        ) : searchTerm.length >= 3 ? (
+                          <div className="px-4 py-3 text-center text-gray-500">
+                            No locations found. Try a different search term.
+                          </div>
+                        ) : (
+                          <div className="px-4 py-3 text-center text-gray-500">
+                            Type at least 3 characters to search
+                          </div>
+                        )}
                       </div>
                     )}
                   </div>
