@@ -4,7 +4,6 @@ const Package = require('../models/Package');
 const jwt = require('jsonwebtoken');
 const JWT_SECRET = process.env.JWT_SECRET || "secret";
 const PaymentTransaction = require('../models/PaymentTransaction'); 
-const { generatePresignedPutUrl, getPublicUrlFromKey } = require('../utils/s3Service');
 
 exports.signup = async (req, res, next) => {
   try {
