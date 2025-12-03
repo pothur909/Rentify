@@ -81,7 +81,7 @@ const multer = require('multer');
 
 exports.createLead = async (req, res, next) => {
   try {
-    const { name, phoneNumber, address, budget, flatType, remark, areaKey } = req.body;
+    const { name, phoneNumber, address, budget, flatType, remark, areaKey, propertyType,  } = req.body;
 
     if (!name || !phoneNumber) {
       return res.status(400).json({ message: 'name and phoneNumber are required' });
@@ -167,6 +167,7 @@ exports.createLead = async (req, res, next) => {
       address,
       budget,
       flatType,
+      propertyType,  
       status,
       areaKey: resolvedAreaKey,
       assignedTo,
@@ -351,7 +352,7 @@ exports.assignOpenLeadsToBroker = async (req, res, next) => {
 
     // Check if broker has enough capacity
     const currentLeadsAssigned = broker.leadsAssigned || 0;
-    const leadLimit = broker.currentPackage.leadLimit || 0;
+    const leadLimit = broker.currentPackage.leadsCount || 0;
     const availableCapacity = leadLimit - currentLeadsAssigned;
 
     if (availableCapacity <= 0) {
@@ -453,7 +454,7 @@ exports.reassignLeadsToAnotherBroker = async (req, res, next) => {
 
     // Check destination broker's capacity
     const currentLeadsAssigned = toBroker.leadsAssigned || 0;
-    const leadLimit = toBroker.currentPackage.leadLimit || 0;
+    const leadLimit = toBroker.currentPackage.leadsCount  || 0;
     const availableCapacity = leadLimit - currentLeadsAssigned;
 
     if (availableCapacity <= 0) {
@@ -522,200 +523,290 @@ exports.reassignLeadsToAnotherBroker = async (req, res, next) => {
  * POST /api/leads/assign-to-broker
  * Body: { brokerId: string, leadIds: string[] } (optional leadIds, if not provided assigns all open leads)
  */
-exports.assignOpenLeadsToBroker = async (req, res, next) => {
+// exports.assignOpenLeadsToBroker = async (req, res, next) => {
+//   try {
+//     const { brokerId, leadIds } = req.body;
+
+//     if (!brokerId) {
+//       return res.status(400).json({ message: 'brokerId is required' });
+//     }
+
+//     // Verify broker exists
+//     const broker = await Broker.findById(brokerId).populate('currentPackage');
+//     if (!broker) {
+//       return res.status(404).json({ message: 'Broker not found' });
+//     }
+
+//     // Check if broker has an active package
+//     if (!broker.currentPackage) {
+//       return res.status(400).json({ message: 'Broker does not have an active package' });
+//     }
+
+//     // Build query for leads to assign
+//     let query = { status: 'open' };
+//     if (leadIds && Array.isArray(leadIds) && leadIds.length > 0) {
+//       query._id = { $in: leadIds };
+//     }
+
+//     // Find leads to assign
+//     const leadsToAssign = await Lead.find(query);
+
+//     if (leadsToAssign.length === 0) {
+//       return res.status(404).json({ message: 'No open leads found to assign' });
+//     }
+
+//     // Check if broker has enough capacity
+//     const currentLeadsAssigned = broker.leadsAssigned || 0;
+//     const leadLimit = broker.currentPackage.leadsCount || 0;
+//     const availableCapacity = leadLimit - currentLeadsAssigned;
+
+//     if (availableCapacity <= 0) {
+//       return res.status(400).json({ 
+//         message: 'Broker has reached their lead limit',
+//         details: {
+//           currentLeadsAssigned,
+//           leadLimit,
+//           availableCapacity: 0
+//         }
+//       });
+//     }
+
+//     // Limit the number of leads to assign based on available capacity
+//     const leadsToAssignCount = Math.min(leadsToAssign.length, availableCapacity);
+//     const leadsToUpdate = leadsToAssign.slice(0, leadsToAssignCount);
+
+//     // Update leads
+//     const leadIdsToUpdate = leadsToUpdate.map(lead => lead._id);
+//     const updateResult = await Lead.updateMany(
+//       { _id: { $in: leadIdsToUpdate } },
+//       { 
+//         $set: { 
+//           assignedTo: brokerId,
+//           assignedAt: new Date(),
+//           status: 'assigned'
+//         }
+//       }
+//     );
+
+//     // Update broker's leadsAssigned counter
+//     await Broker.findByIdAndUpdate(brokerId, { 
+//       $inc: { leadsAssigned: leadsToAssignCount } 
+//     });
+
+//     return res.json({
+//       message: 'Leads assigned successfully',
+//       data: {
+//         assignedCount: leadsToAssignCount,
+//         totalRequested: leadsToAssign.length,
+//         brokerName: broker.name,
+//         brokerId: broker._id,
+//         newLeadsAssigned: currentLeadsAssigned + leadsToAssignCount,
+//         leadLimit: leadLimit,
+//         remainingCapacity: availableCapacity - leadsToAssignCount
+//       }
+//     });
+//   } catch (err) {
+//     next(err);
+//   }
+// };
+
+// /**
+//  * Reassign leads from one broker to another
+//  * POST /api/leads/reassign-leads
+//  * Body: { fromBrokerId: string, toBrokerId: string, leadIds: string[] } (optional leadIds, if not provided reassigns all leads)
+//  */
+// exports.reassignLeadsToAnotherBroker = async (req, res, next) => {
+//   try {
+//     const { fromBrokerId, toBrokerId, leadIds } = req.body;
+
+//     if (!fromBrokerId || !toBrokerId) {
+//       return res.status(400).json({ message: 'fromBrokerId and toBrokerId are required' });
+//     }
+
+//     if (fromBrokerId === toBrokerId) {
+//       return res.status(400).json({ message: 'fromBrokerId and toBrokerId cannot be the same' });
+//     }
+
+//     // Verify both brokers exist
+//     const fromBroker = await Broker.findById(fromBrokerId);
+//     const toBroker = await Broker.findById(toBrokerId).populate('currentPackage');
+
+//     if (!fromBroker) {
+//       return res.status(404).json({ message: 'Source broker not found' });
+//     }
+
+//     if (!toBroker) {
+//       return res.status(404).json({ message: 'Destination broker not found' });
+//     }
+
+//     // Check if destination broker has an active package
+//     if (!toBroker.currentPackage) {
+//       return res.status(400).json({ message: 'Destination broker does not have an active package' });
+//     }
+
+//     // Build query for leads to reassign
+//     let query = { assignedTo: fromBrokerId };
+//     if (leadIds && Array.isArray(leadIds) && leadIds.length > 0) {
+//       query._id = { $in: leadIds };
+//     }
+
+//     // Find leads to reassign
+//     const leadsToReassign = await Lead.find(query);
+
+//     if (leadsToReassign.length === 0) {
+//       return res.status(404).json({ message: 'No leads found assigned to the source broker' });
+//     }
+
+//     // Check destination broker's capacity
+//     const currentLeadsAssigned = toBroker.leadsAssigned || 0;
+//     const leadLimit = toBroker.currentPackage.leadsCount || 0;
+//     const availableCapacity = leadLimit - currentLeadsAssigned;
+
+//     if (availableCapacity <= 0) {
+//       return res.status(400).json({ 
+//         message: 'Destination broker has reached their lead limit',
+//         details: {
+//           currentLeadsAssigned,
+//           leadLimit,
+//           availableCapacity: 0
+//         }
+//       });
+//     }
+
+//     // Limit the number of leads to reassign based on available capacity
+//     const leadsToReassignCount = Math.min(leadsToReassign.length, availableCapacity);
+//     const leadsToUpdate = leadsToReassign.slice(0, leadsToReassignCount);
+
+//     // Update leads
+//     const leadIdsToUpdate = leadsToUpdate.map(lead => lead._id);
+//     const updateResult = await Lead.updateMany(
+//       { _id: { $in: leadIdsToUpdate } },
+//       { 
+//         $set: { 
+//           assignedTo: toBrokerId,
+//           assignedAt: new Date(),
+//           status: 'assigned'
+//         }
+//       }
+//     );
+
+//     // Update both brokers' leadsAssigned counters
+//     await Broker.findByIdAndUpdate(fromBrokerId, { 
+//       $inc: { leadsAssigned: -leadsToReassignCount } 
+//     });
+
+//     await Broker.findByIdAndUpdate(toBrokerId, { 
+//       $inc: { leadsAssigned: leadsToReassignCount } 
+//     });
+
+//     return res.json({
+//       message: 'Leads reassigned successfully',
+//       data: {
+//         reassignedCount: leadsToReassignCount,
+//         totalRequested: leadsToReassign.length,
+//         fromBroker: {
+//           name: fromBroker.name,
+//           id: fromBroker._id,
+//           newLeadsAssigned: (fromBroker.leadsAssigned || 0) - leadsToReassignCount
+//         },
+//         toBroker: {
+//           name: toBroker.name,
+//           id: toBroker._id,
+//           newLeadsAssigned: currentLeadsAssigned + leadsToReassignCount,
+//           leadLimit: leadLimit,
+//           remainingCapacity: availableCapacity - leadsToReassignCount
+//         }
+//       }
+//     });
+//   } catch (err) {
+//     next(err);
+//   }
+// };
+
+
+
+// exports.getBrokersByArea = async (req, res, next) => {
+//   try {
+//     const { areaKey, address } = req.query;
+
+//     if (!areaKey && !address) {
+//       return res.status(400).json({ message: 'areaKey or address is required' });
+//     }
+
+//     const search = (areaKey || address || '').toLowerCase();
+
+//     // Get all brokers with serviceAreas
+//     const brokers = await Broker.find({
+//       serviceAreas: { $exists: true, $ne: [] },
+//     })
+//       .populate('currentPackage', 'name leadLimit leadsCount')
+//       .lean();
+
+//     // Filter brokers whose serviceAreas match the areaKey or are included in address
+//     const filtered = brokers.filter(b =>
+//       (b.serviceAreas || []).some(a => {
+//         const area = String(a).toLowerCase();
+//         return (
+//           area === search ||
+//           search.includes(area) ||
+//           area.includes(search)
+//         );
+//       })
+//     );
+
+//     return res.json({
+//       message: 'Brokers fetched successfully',
+//       data: filtered.map(b => ({
+//         _id: b._id,
+//         name: b.name,
+//         phoneNumber: b.phoneNumber,
+//         serviceAreas: b.serviceAreas,
+//         leadsAssigned: b.leadsAssigned || 0,
+//         currentPackage: b.currentPackage || null,
+//       })),
+//     });
+//   } catch (err) {
+//     next(err);
+//   }
+// };
+
+exports.getBrokersByArea = async (req, res, next) => {
   try {
-    const { brokerId, leadIds } = req.body;
+    const { areaKey, address } = req.query;
 
-    if (!brokerId) {
-      return res.status(400).json({ message: 'brokerId is required' });
+    if (!areaKey && !address) {
+      return res.status(400).json({ message: 'areaKey or address is required' });
     }
 
-    // Verify broker exists
-    const broker = await Broker.findById(brokerId).populate('currentPackage');
-    if (!broker) {
-      return res.status(404).json({ message: 'Broker not found' });
-    }
+    const search = (areaKey || address || '').toLowerCase();
 
-    // Check if broker has an active package
-    if (!broker.currentPackage) {
-      return res.status(400).json({ message: 'Broker does not have an active package' });
-    }
+    const brokers = await Broker.find({
+      serviceAreas: { $exists: true, $ne: [] },
+    })
+      .populate('currentPackage', 'name leadLimit leadsCount')
+      .lean();
 
-    // Build query for leads to assign
-    let query = { status: 'open' };
-    if (leadIds && Array.isArray(leadIds) && leadIds.length > 0) {
-      query._id = { $in: leadIds };
-    }
-
-    // Find leads to assign
-    const leadsToAssign = await Lead.find(query);
-
-    if (leadsToAssign.length === 0) {
-      return res.status(404).json({ message: 'No open leads found to assign' });
-    }
-
-    // Check if broker has enough capacity
-    const currentLeadsAssigned = broker.leadsAssigned || 0;
-    const leadLimit = broker.currentPackage.leadLimit || 0;
-    const availableCapacity = leadLimit - currentLeadsAssigned;
-
-    if (availableCapacity <= 0) {
-      return res.status(400).json({ 
-        message: 'Broker has reached their lead limit',
-        details: {
-          currentLeadsAssigned,
-          leadLimit,
-          availableCapacity: 0
-        }
-      });
-    }
-
-    // Limit the number of leads to assign based on available capacity
-    const leadsToAssignCount = Math.min(leadsToAssign.length, availableCapacity);
-    const leadsToUpdate = leadsToAssign.slice(0, leadsToAssignCount);
-
-    // Update leads
-    const leadIdsToUpdate = leadsToUpdate.map(lead => lead._id);
-    const updateResult = await Lead.updateMany(
-      { _id: { $in: leadIdsToUpdate } },
-      { 
-        $set: { 
-          assignedTo: brokerId,
-          assignedAt: new Date(),
-          status: 'assigned'
-        }
-      }
+    const filtered = brokers.filter(b =>
+      (b.serviceAreas || []).some(a => {
+        const area = String(a).toLowerCase();
+        return (
+          area === search ||
+          search.includes(area) ||
+          area.includes(search)
+        );
+      })
     );
 
-    // Update broker's leadsAssigned counter
-    await Broker.findByIdAndUpdate(brokerId, { 
-      $inc: { leadsAssigned: leadsToAssignCount } 
-    });
-
     return res.json({
-      message: 'Leads assigned successfully',
-      data: {
-        assignedCount: leadsToAssignCount,
-        totalRequested: leadsToAssign.length,
-        brokerName: broker.name,
-        brokerId: broker._id,
-        newLeadsAssigned: currentLeadsAssigned + leadsToAssignCount,
-        leadLimit: leadLimit,
-        remainingCapacity: availableCapacity - leadsToAssignCount
-      }
-    });
-  } catch (err) {
-    next(err);
-  }
-};
-
-/**
- * Reassign leads from one broker to another
- * POST /api/leads/reassign-leads
- * Body: { fromBrokerId: string, toBrokerId: string, leadIds: string[] } (optional leadIds, if not provided reassigns all leads)
- */
-exports.reassignLeadsToAnotherBroker = async (req, res, next) => {
-  try {
-    const { fromBrokerId, toBrokerId, leadIds } = req.body;
-
-    if (!fromBrokerId || !toBrokerId) {
-      return res.status(400).json({ message: 'fromBrokerId and toBrokerId are required' });
-    }
-
-    if (fromBrokerId === toBrokerId) {
-      return res.status(400).json({ message: 'fromBrokerId and toBrokerId cannot be the same' });
-    }
-
-    // Verify both brokers exist
-    const fromBroker = await Broker.findById(fromBrokerId);
-    const toBroker = await Broker.findById(toBrokerId).populate('currentPackage');
-
-    if (!fromBroker) {
-      return res.status(404).json({ message: 'Source broker not found' });
-    }
-
-    if (!toBroker) {
-      return res.status(404).json({ message: 'Destination broker not found' });
-    }
-
-    // Check if destination broker has an active package
-    if (!toBroker.currentPackage) {
-      return res.status(400).json({ message: 'Destination broker does not have an active package' });
-    }
-
-    // Build query for leads to reassign
-    let query = { assignedTo: fromBrokerId };
-    if (leadIds && Array.isArray(leadIds) && leadIds.length > 0) {
-      query._id = { $in: leadIds };
-    }
-
-    // Find leads to reassign
-    const leadsToReassign = await Lead.find(query);
-
-    if (leadsToReassign.length === 0) {
-      return res.status(404).json({ message: 'No leads found assigned to the source broker' });
-    }
-
-    // Check destination broker's capacity
-    const currentLeadsAssigned = toBroker.leadsAssigned || 0;
-    const leadLimit = toBroker.currentPackage.leadLimit || 0;
-    const availableCapacity = leadLimit - currentLeadsAssigned;
-
-    if (availableCapacity <= 0) {
-      return res.status(400).json({ 
-        message: 'Destination broker has reached their lead limit',
-        details: {
-          currentLeadsAssigned,
-          leadLimit,
-          availableCapacity: 0
-        }
-      });
-    }
-
-    // Limit the number of leads to reassign based on available capacity
-    const leadsToReassignCount = Math.min(leadsToReassign.length, availableCapacity);
-    const leadsToUpdate = leadsToReassign.slice(0, leadsToReassignCount);
-
-    // Update leads
-    const leadIdsToUpdate = leadsToUpdate.map(lead => lead._id);
-    const updateResult = await Lead.updateMany(
-      { _id: { $in: leadIdsToUpdate } },
-      { 
-        $set: { 
-          assignedTo: toBrokerId,
-          assignedAt: new Date(),
-          status: 'assigned'
-        }
-      }
-    );
-
-    // Update both brokers' leadsAssigned counters
-    await Broker.findByIdAndUpdate(fromBrokerId, { 
-      $inc: { leadsAssigned: -leadsToReassignCount } 
-    });
-
-    await Broker.findByIdAndUpdate(toBrokerId, { 
-      $inc: { leadsAssigned: leadsToReassignCount } 
-    });
-
-    return res.json({
-      message: 'Leads reassigned successfully',
-      data: {
-        reassignedCount: leadsToReassignCount,
-        totalRequested: leadsToReassign.length,
-        fromBroker: {
-          name: fromBroker.name,
-          id: fromBroker._id,
-          newLeadsAssigned: (fromBroker.leadsAssigned || 0) - leadsToReassignCount
-        },
-        toBroker: {
-          name: toBroker.name,
-          id: toBroker._id,
-          newLeadsAssigned: currentLeadsAssigned + leadsToReassignCount,
-          leadLimit: leadLimit,
-          remainingCapacity: availableCapacity - leadsToReassignCount
-        }
-      }
+      message: 'Brokers fetched successfully',
+      data: filtered.map(b => ({
+        _id: b._id,
+        name: b.name,
+        phoneNumber: b.phoneNumber,
+        serviceAreas: b.serviceAreas,
+        leadsAssigned: b.leadsAssigned || 0,
+        currentPackage: b.currentPackage || null,
+      })),
     });
   } catch (err) {
     next(err);
@@ -936,7 +1027,7 @@ function normalizeExcelPhone(raw) {
 
 
 async function createLeadForBulk(payload) {
-  const { name, phoneNumber, address, budget, flatType, remark, areaKey } = payload;
+  const { name, phoneNumber, address, budget, flatType, remark, areaKey, propertyType } = payload;
 
   if (!name || !phoneNumber) {
     throw new Error('name and phoneNumber are required');
@@ -1024,6 +1115,7 @@ async function createLeadForBulk(payload) {
     address,
     budget,
     flatType,
+    propertyType,
     status,
     areaKey: resolvedAreaKey,
     assignedTo,
@@ -1078,6 +1170,7 @@ exports.bulkCreateLeads = async (req, res, next) => {
         flatType: String(row.flatType || row.FlatType || '').trim(),
         areaKey: String(row.areaKey || row.AreaKey || '').trim(),
         remark: String(row.remark || row.Remark || '').trim(),
+        propertyType: String(row.propertyType || row.PropertyType || '' ).trim(),
       };
 
       // budget numeric
