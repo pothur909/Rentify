@@ -220,9 +220,6 @@ exports.getAssignedLeads = async (req, res, next) => {
 };
 
 
-
-
-
 //////////purchase package controller is not in use and also the package import also const Package = require('../models/Package'); ////////////
 
 exports.purchasePackage = async (req, res, next) => {
@@ -282,43 +279,43 @@ exports.purchasePackage = async (req, res, next) => {
   }
 };
 
-exports.getAllBrokersForAdmin = async (req, res, next) => {
-  try {
-    // Get pagination parameters from query string
-    const page = parseInt(req.query.page) || 1;
-    const limit = parseInt(req.query.limit) || 10;
-    const skip = (page - 1) * limit;
+// exports.getAllBrokersForAdmin = async (req, res, next) => {
+//   try {
+//     // Get pagination parameters from query string
+//     const page = parseInt(req.query.page) || 1;
+//     const limit = parseInt(req.query.limit) || 10;
+//     const skip = (page - 1) * limit;
 
-    // Get total count for pagination metadata
-    const totalCount = await Broker.countDocuments();
+//     // Get total count for pagination metadata
+//     const totalCount = await Broker.countDocuments();
 
-    // Fetch paginated brokers
-    const brokers = await Broker.find()
-      .populate('currentPackage', 'name leadLimit price isActive')
-      .sort({ createdAt: -1 })
-      .skip(skip)
-      .limit(limit)
-      .lean();
+//     // Fetch paginated brokers
+//     const brokers = await Broker.find()
+//       .populate('currentPackage', 'name leadLimit price isActive')
+//       .sort({ createdAt: -1 })
+//       .skip(skip)
+//       .limit(limit)
+//       .lean();
 
-    // Calculate pagination metadata
-    const totalPages = Math.ceil(totalCount / limit);
-    const hasMore = page < totalPages;
+//     // Calculate pagination metadata
+//     const totalPages = Math.ceil(totalCount / limit);
+//     const hasMore = page < totalPages;
 
-    return res.json({ 
-      message: 'Brokers fetched successfully', 
-      pagination: {
-        currentPage: page,
-        pageSize: limit,
-        totalCount: totalCount,
-        totalPages: totalPages,
-        hasMore: hasMore
-      },
-      data: brokers
-    });
-  } catch (err) {
-    next(err);
-  }
-};
+//     return res.json({ 
+//       message: 'Brokers fetched successfully', 
+//       pagination: {
+//         currentPage: page,
+//         pageSize: limit,
+//         totalCount: totalCount,
+//         totalPages: totalPages,
+//         hasMore: hasMore
+//       },
+//       data: brokers
+//     });
+//   } catch (err) {
+//     next(err);
+//   }
+// };
 
 
 
@@ -417,6 +414,109 @@ exports.getAllBrokersForAdmin = async (req, res, next) => {
 //   }
 // };
 
+exports.getAllBrokersForAdmin = async (req, res, next) => {
+  try {
+    const page = parseInt(req.query.page) || 1;
+    const limit = parseInt(req.query.limit) || 10;
+    const skip = (page - 1) * limit;
+
+    const totalCount = await Broker.countDocuments();
+
+    const brokers = await Broker.find()
+      .populate('currentPackage', 'name leadsCount price isActive')
+      .sort({ createdAt: -1 })
+      .skip(skip)
+      .limit(limit)
+      .lean();
+
+    // aggregate lead stats per broker
+    const leadStats = await Lead.aggregate([
+      {
+        $group: {
+          _id: '$assignedTo',
+          totalAssigned: { $sum: 1 },
+          newLeads: {
+            $sum: {
+              $cond: [{ $eq: ['$status', 'assigned'] }, 1, 0],
+            },
+          },
+          contacted: {
+            $sum: {
+              $cond: [{ $eq: ['$status', 'contacted'] }, 1, 0],
+            },
+          },
+        },
+      },
+    ]);
+
+    const statsMap = {};
+    for (const s of leadStats) {
+      if (!s._id) continue;
+      const key = s._id.toString();
+      statsMap[key] = {
+        totalAssigned: s.totalAssigned || 0,
+        newLeads: s.newLeads || 0,
+        contacted: s.contacted || 0,
+      };
+    }
+
+    const enriched = brokers.map(b => {
+      const key = b._id.toString();
+      const agg = statsMap[key] || {
+        totalAssigned: 0,
+        newLeads: 0,
+        contacted: 0,
+      };
+
+      const packageTotalLeads = b.currentPackage
+        ? b.currentPackage.leadsCount || 0
+        : 0;
+
+      // const leadsAssignedCounter = b.leadsAssigned || 0;
+
+      // // remaining = total from package - already assigned (counter)
+      // const remainingLeads = Math.max(
+      //   packageTotalLeads - leadsAssignedCounter,
+      //   0
+      // );
+
+      const assignedByCounter = b.leadsAssigned || 0;
+
+const remainingLeads = Math.max(
+  packageTotalLeads - assignedByCounter,
+  0
+)
+
+      return {
+        ...b,
+        stats: {
+          packageTotalLeads,
+          remainingLeads,
+          newLeads: agg.newLeads,
+          contacted: agg.contacted,
+          totalAssigned: agg.totalAssigned,
+        },
+      };
+    });
+
+    const totalPages = Math.ceil(totalCount / limit);
+    const hasMore = page < totalPages;
+
+    return res.json({
+      message: 'Brokers fetched successfully',
+      pagination: {
+        currentPage: page,
+        pageSize: limit,
+        totalCount,
+        totalPages,
+        hasMore,
+      },
+      data: enriched,
+    });
+  } catch (err) {
+    next(err);
+  }
+};
 
 exports.getBrokerDashboardStats = async (req, res, next) => {
   try {

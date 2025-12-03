@@ -7,16 +7,22 @@
 //   const workbook = new ExcelJS.Workbook();
 //   const sheet = workbook.addWorksheet('Leads Template');
 
-//   // Columns:  A        B            C        D        E         F        G
+//   // Columns:  A        B            C        D         E             F         G        H
 //   sheet.columns = [
-//     { header: 'name',        key: 'name',        width: 25 },
-//     { header: 'phoneNumber', key: 'phoneNumber', width: 20, style: { numFmt: '@' } }, // text
-//     { header: 'address',     key: 'address',     width: 20 },
-//     { header: 'budget',      key: 'budget',      width: 15 },
-//     { header: 'propertyType',  key: 'propertyType',  width: 20 },
-//     { header: 'flatType',    key: 'flatType',    width: 15 },
-//     { header: 'areaKey',     key: 'areaKey',     width: 25 },
-//     { header: 'remark',      key: 'remark',      width: 30 },
+//     { header: 'name',          key: 'name',          width: 25 },
+//     { header: 'phoneNumber',   key: 'phoneNumber',   width: 20, style: { numFmt: '@' } }, // text
+//     { header: 'address',       key: 'address',       width: 20 },
+//     { header: 'budget',        key: 'budget',        width: 15 },
+//     { header: 'propertyType',  key: 'propertyType',  width: 20 },  // NEW
+//     { header: 'flatType',      key: 'flatType',      width: 15 },
+//     { header: 'furnishingType', key: 'furnishingType', width: 20 },
+//     {
+//       header: 'amenities',
+//       key: 'amenities',
+//       width: 30, // comma separated: "Parking, Security"
+//     },
+//     { header: 'areaKey',       key: 'areaKey',       width: 25 },
+//     { header: 'remark',        key: 'remark',        width: 30 },
 //   ];
 
 //   // Make sure header row is bold
@@ -29,7 +35,7 @@
 //   // Dropdown options
 //   const flatTypes = ['1RK', '1BHK', '2BHK', '3BHK', '4BHK', 'Villa', 'Penthouse'];
 
-//     const propertyTypes = [
+//   const propertyTypes = [
 //     'Standalone house',
 //     'Apartment',
 //     'Gated community',
@@ -37,16 +43,16 @@
 //     'Villa',
 //     'PG / Co-living',
 //     'Plot / Land',
+//     'Anything is fine',
 //   ];
 
 //   const budgetOptions = [
-//     '0-10000',
-//     '10000-20000',
-//     '20000-30000',
-//     '30000-50000',
-//     '50000-75000',
-//     '75000-100000',
-//     '100000-above',
+//     '10000-15000',
+//     '15000-20000',
+//     '20000-25000',
+//     '25000-35000',
+//     '35000-50000',
+//     '50000-above',
 //   ];
 
 //   const areaOptions = [
@@ -65,13 +71,11 @@
 //     'Subramanyanagar',
 //   ];
 
-//   // Apply dropdowns to a range of rows (2 to 5000) in specific columns:
-//   // flatType -> column E, budget -> column D, areaKey -> column F
-//   sheet.dataValidations.add('E2:E5000', {
-//     type: 'list',
-//     allowBlank: true,
-//     formulae: [`"${flatTypes.join(',')}"`],
-//   });
+//   // Apply dropdowns to a range of rows (2 to 5000):
+//   // budget       -> column D
+//   // propertyType -> column E
+//   // flatType     -> column F
+//   // areaKey      -> column G
 
 //   sheet.dataValidations.add('D2:D5000', {
 //     type: 'list',
@@ -79,7 +83,19 @@
 //     formulae: [`"${budgetOptions.join(',')}"`],
 //   });
 
+//   sheet.dataValidations.add('E2:E5000', {
+//     type: 'list',
+//     allowBlank: true,
+//     formulae: [`"${propertyTypes.join(',')}"`],
+//   });
+
 //   sheet.dataValidations.add('F2:F5000', {
+//     type: 'list',
+//     allowBlank: true,
+//     formulae: [`"${flatTypes.join(',')}"`],
+//   });
+
+//   sheet.dataValidations.add('G2:G5000', {
 //     type: 'list',
 //     allowBlank: true,
 //     formulae: [`"${areaOptions.join(',')}"`],
@@ -107,27 +123,58 @@ async function generateLeadTemplate() {
   const workbook = new ExcelJS.Workbook();
   const sheet = workbook.addWorksheet('Leads Template');
 
-  // Columns:  A        B            C        D         E             F         G        H
+  // Columns:
+  // A name
+  // B phoneNumber
+  // C address
+  // D budget
+  // E propertyType
+  // F flatType
+  // G furnishingType
+  // H amenities
+  // I areaKey
+  // J remark
   sheet.columns = [
-    { header: 'name',          key: 'name',          width: 25 },
-    { header: 'phoneNumber',   key: 'phoneNumber',   width: 20, style: { numFmt: '@' } }, // text
-    { header: 'address',       key: 'address',       width: 20 },
-    { header: 'budget',        key: 'budget',        width: 15 },
-    { header: 'propertyType',  key: 'propertyType',  width: 20 },  // NEW
-    { header: 'flatType',      key: 'flatType',      width: 15 },
-    { header: 'areaKey',       key: 'areaKey',       width: 25 },
-    { header: 'remark',        key: 'remark',        width: 30 },
+    { header: 'name',           key: 'name',           width: 25 },
+    {
+      header: 'phoneNumber',
+      key: 'phoneNumber',
+      width: 20,
+      style: { numFmt: '@' }, // as text
+    },
+    { header: 'address',        key: 'address',        width: 25 },
+    { header: 'budget',         key: 'budget',         width: 18 },
+    { header: 'propertyType',   key: 'propertyType',   width: 22 },
+    { header: 'flatType',       key: 'flatType',       width: 18 },
+    { header: 'furnishingType', key: 'furnishingType', width: 20 },
+    {
+      header: 'amenities',
+      key: 'amenities',
+      width: 30, // comma separated: "Parking, Security"
+    },
+    { header: 'areaKey',        key: 'areaKey',        width: 25 },
+    { header: 'remark',         key: 'remark',         width: 30 },
   ];
 
-  // Make sure header row is bold
+  // Bold header
   const headerRow = sheet.getRow(1);
   headerRow.font = { bold: true };
 
-  // Ensure phoneNumber column is text
+  // Make sure phoneNumber is text
   sheet.getColumn('phoneNumber').numFmt = '@';
 
   // Dropdown options
-  const flatTypes = ['1RK', '1BHK', '2BHK', '3BHK', '4BHK', 'Villa', 'Penthouse'];
+
+  const flatTypes = [
+    '1RK',
+    '1BHK',
+    '2BHK',
+    '3BHK',
+    '4BHK',
+    'Villa',
+    'Penthouse',
+    'Anything is fine',
+  ];
 
   const propertyTypes = [
     'Standalone house',
@@ -137,16 +184,21 @@ async function generateLeadTemplate() {
     'Villa',
     'PG / Co-living',
     'Plot / Land',
+    'Anything is fine',
   ];
 
+  const furnishingTypes = ['Fully Furnished', 'Semi Furnished', 'Unfurnished'];
+
+  const amenitiesOptions = ['Parking', 'Security', 'Power backup', 'Lift', 'Balcony'];
+
+  // Your new budget ranges
   const budgetOptions = [
-    '0-10000',
-    '10000-20000',
-    '20000-30000',
-    '30000-50000',
-    '50000-75000',
-    '75000-100000',
-    '100000-above',
+    '10000-15000',
+    '15000-20000',
+    '20000-25000',
+    '25000-35000',
+    '35000-50000',
+    '50000-above',
   ];
 
   const areaOptions = [
@@ -165,11 +217,13 @@ async function generateLeadTemplate() {
     'Subramanyanagar',
   ];
 
-  // Apply dropdowns to a range of rows (2 to 5000):
-  // budget       -> column D
-  // propertyType -> column E
-  // flatType     -> column F
-  // areaKey      -> column G
+  // Apply dropdowns on rows 2 to 5000:
+  // D budget
+  // E propertyType
+  // F flatType
+  // G furnishingType
+  // H amenities
+  // I areaKey
 
   sheet.dataValidations.add('D2:D5000', {
     type: 'list',
@@ -190,6 +244,18 @@ async function generateLeadTemplate() {
   });
 
   sheet.dataValidations.add('G2:G5000', {
+    type: 'list',
+    allowBlank: true,
+    formulae: [`"${furnishingTypes.join(',')}"`],
+  });
+
+  sheet.dataValidations.add('H2:H5000', {
+    type: 'list',
+    allowBlank: true,
+    formulae: [`"${amenitiesOptions.join(',')}"`],
+  });
+
+  sheet.dataValidations.add('I2:I5000', {
     type: 'list',
     allowBlank: true,
     formulae: [`"${areaOptions.join(',')}"`],
