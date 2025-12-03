@@ -81,10 +81,19 @@ const multer = require('multer');
 
 exports.createLead = async (req, res, next) => {
   try {
-    const { name, phoneNumber, address, budget, flatType, remark, areaKey, propertyType,  } = req.body;
+    const { name, phoneNumber, address, budget, flatType, remark, areaKey, propertyType,   furnishingType, amenities, } = req.body;
 
     if (!name || !phoneNumber) {
       return res.status(400).json({ message: 'name and phoneNumber are required' });
+    }
+
+    // backend guard so bad data cannot slip in from somewhere else
+    if (!propertyType) {
+      return res.status(400).json({ message: 'propertyType is required' });
+    }
+
+    if (!flatType) {
+      return res.status(400).json({ message: 'flatType is required' });
     }
 
     let resolvedAreaKey = areaKey || null;
@@ -168,6 +177,8 @@ exports.createLead = async (req, res, next) => {
       budget,
       flatType,
       propertyType,  
+     furnishingType: furnishingType || undefined,
+      amenities: Array.isArray(amenities) ? amenities : [],
       status,
       areaKey: resolvedAreaKey,
       assignedTo,
@@ -770,6 +781,50 @@ exports.reassignLeadsToAnotherBroker = async (req, res, next) => {
 //   }
 // };
 
+// exports.getBrokersByArea = async (req, res, next) => {
+//   try {
+//     const { areaKey, address } = req.query;
+
+//     if (!areaKey && !address) {
+//       return res.status(400).json({ message: 'areaKey or address is required' });
+//     }
+
+//     const search = (areaKey || address || '').toLowerCase();
+
+//     const brokers = await Broker.find({
+//       serviceAreas: { $exists: true, $ne: [] },
+//     })
+//       .populate('currentPackage', 'name leadLimit leadsCount')
+//       .lean();
+
+//     const filtered = brokers.filter(b =>
+//       (b.serviceAreas || []).some(a => {
+//         const area = String(a).toLowerCase();
+//         return (
+//           area === search ||
+//           search.includes(area) ||
+//           area.includes(search)
+//         );
+//       })
+//     );
+
+//     return res.json({
+//       message: 'Brokers fetched successfully',
+//       data: filtered.map(b => ({
+//         _id: b._id,
+//         name: b.name,
+//         phoneNumber: b.phoneNumber,
+//         serviceAreas: b.serviceAreas,
+//         leadsAssigned: b.leadsAssigned || 0,
+//         currentPackage: b.currentPackage || null,
+//       })),
+//     });
+//   } catch (err) {
+//     next(err);
+//   }
+// };
+
+// controllers/leadController.js (or wherever this lives)
 exports.getBrokersByArea = async (req, res, next) => {
   try {
     const { areaKey, address } = req.query;
@@ -783,19 +838,36 @@ exports.getBrokersByArea = async (req, res, next) => {
     const brokers = await Broker.find({
       serviceAreas: { $exists: true, $ne: [] },
     })
-      .populate('currentPackage', 'name leadLimit leadsCount')
+      .populate('currentPackage', 'name leadsCount') // no leadLimit
       .lean();
 
-    const filtered = brokers.filter(b =>
-      (b.serviceAreas || []).some(a => {
+    const filtered = brokers.filter(b => {
+      const serviceAreas = b.serviceAreas || [];
+
+      // area match
+      const matchesArea = serviceAreas.some(a => {
         const area = String(a).toLowerCase();
         return (
           area === search ||
           search.includes(area) ||
           area.includes(search)
         );
-      })
-    );
+      });
+
+      if (!matchesArea) return false;
+
+      // must have active package and capacity
+      const pkg = b.currentPackage;
+      const leadsAssigned = b.leadsAssigned || 0;
+      const leadLimit = pkg && typeof pkg.leadsCount === 'number' ? pkg.leadsCount : 0;
+      const remaining = leadLimit - leadsAssigned;
+
+      // only show if paid & has package & capacity > 0
+      const hasActivePackage = !!pkg && leadLimit > 0;
+      const hasCapacity = remaining > 0;
+
+      return hasActivePackage && hasCapacity;
+    });
 
     return res.json({
       message: 'Brokers fetched successfully',
@@ -806,12 +878,16 @@ exports.getBrokersByArea = async (req, res, next) => {
         serviceAreas: b.serviceAreas,
         leadsAssigned: b.leadsAssigned || 0,
         currentPackage: b.currentPackage || null,
+        // optional: send capacity info if you ever want to show it in UI
+        // leadLimit: b.currentPackage?.leadsCount || 0,
+        // remainingCapacity: (b.currentPackage?.leadsCount || 0) - (b.leadsAssigned || 0),
       })),
     });
   } catch (err) {
     next(err);
   }
 };
+
 
 function normalizeExcelPhone(raw) {
   if (raw === undefined || raw === null) return '';
@@ -1027,10 +1103,18 @@ function normalizeExcelPhone(raw) {
 
 
 async function createLeadForBulk(payload) {
-  const { name, phoneNumber, address, budget, flatType, remark, areaKey, propertyType } = payload;
+  const { name, phoneNumber, address, budget, flatType, remark, areaKey, propertyType,  furnishingType, amenities, } = payload;
 
   if (!name || !phoneNumber) {
     throw new Error('name and phoneNumber are required');
+  }
+
+    if (!propertyType) {
+    throw new Error('propertyType is required');
+  }
+
+  if (!flatType) {
+    throw new Error('flatType is required');
   }
 
   let resolvedAreaKey = areaKey || null;
@@ -1116,6 +1200,8 @@ async function createLeadForBulk(payload) {
     budget,
     flatType,
     propertyType,
+    furnishingType: furnishingType || undefined,
+    amenities: Array.isArray(amenities) ? amenities : [],
     status,
     areaKey: resolvedAreaKey,
     assignedTo,
@@ -1163,6 +1249,18 @@ exports.bulkCreateLeads = async (req, res, next) => {
         row['Phone Number'] ||
         row['phone_number'];
 
+        // parse amenities (can be comma separated in Excel)
+      let amenities = [];
+      const rawAmenities = row.amenities || row.Amenities;
+      if (rawAmenities) {
+        const asString = String(rawAmenities);
+        amenities = asString
+          .split(',')
+          .map(s => s.trim())
+          .filter(Boolean);
+      }
+
+
       const payload = {
         name: String(row.name || row.Name || '').trim(),
         phoneNumber: normalizeExcelPhone(rawPhone),
@@ -1171,6 +1269,8 @@ exports.bulkCreateLeads = async (req, res, next) => {
         areaKey: String(row.areaKey || row.AreaKey || '').trim(),
         remark: String(row.remark || row.Remark || '').trim(),
         propertyType: String(row.propertyType || row.PropertyType || '' ).trim(),
+        furnishingType: String(row.furnishingType || row.FurnishingType || '').trim(),
+        amenities,
       };
 
       // budget numeric
