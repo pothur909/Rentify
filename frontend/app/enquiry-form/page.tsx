@@ -846,13 +846,8 @@ export default function EnquiryForm() {
       address: 'Bangalore',
       areaKey: location.area_name,
     });
-    
-    // Clear everything and close dropdown
-    setLocationSuggestions([]); // Clear suggestions first
-    setSearchTerm(location.area_name);
-    setShowSuggestions(false); // Then close dropdown
-    setShowSubLocations(false);
-    setSelectedBaseArea(null);
+    setSearchTerm(area);
+    setShowSuggestions(false);
   };
 
   // const handleSubmit = async () => {

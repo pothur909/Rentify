@@ -1,6 +1,8 @@
 const Package = require('../models/Package');
 const Broker = require('../models/Broker');
 const LeadPackage = require('../models/LeadPackage');
+const Lead = require('../models/Lead');
+const { assignLeadIfPossible } = require('../services/leadAssignmentWatcher');
 
 // Get all active packages
 exports.getAllPackages = async (req, res, next) => {
@@ -196,6 +198,50 @@ exports.assignLeadPackageToBroker = async (req, res, next) => {
     await broker.save();
     await broker.populate('currentPackage');
 
+    // 4. Automatically assign open leads that match broker's service areas
+    let assignedLeadsCount = 0;
+    try {
+      // Find all open leads
+      const openLeads = await Lead.find({ 
+        status: 'open',
+        $or: [
+          { assignedTo: null },
+          { assignedTo: { $exists: false } }
+        ]
+      }).lean();
+
+      console.log(`Found ${openLeads.length} open leads to process for broker ${broker._id}`);
+
+      // Try to assign each open lead
+      for (const lead of openLeads) {
+        try {
+          // Check if broker has capacity remaining
+          const currentBroker = await Broker.findById(brokerId);
+          if (currentBroker.leadsAssigned >= pkg.leadsCount) {
+            console.log(`Broker ${brokerId} has reached lead capacity`);
+            break; // Stop if broker has reached capacity
+          }
+
+          // Try to assign this lead (assignLeadIfPossible handles all the logic)
+          await assignLeadIfPossible(lead);
+          
+          // Check if the lead was actually assigned to this broker
+          const updatedLead = await Lead.findById(lead._id);
+          if (updatedLead && updatedLead.assignedTo && updatedLead.assignedTo.toString() === brokerId.toString()) {
+            assignedLeadsCount++;
+          }
+        } catch (err) {
+          console.error(`Error assigning lead ${lead._id}:`, err.message);
+          // Continue with next lead even if one fails
+        }
+      }
+
+      console.log(`Successfully assigned ${assignedLeadsCount} leads to broker ${brokerId}`);
+    } catch (err) {
+      console.error('Error during automatic lead assignment:', err.message);
+      // Don't fail the entire request if lead assignment fails
+    }
+
     return res.json({
       success: true,
       message: 'Lead package assigned to broker successfully',
@@ -206,6 +252,7 @@ exports.assignLeadPackageToBroker = async (req, res, next) => {
         packagePurchasedAt: broker.packagePurchasedAt,
         leadsAssigned: broker.leadsAssigned,
         leadLimit: broker.currentLeadLimit,
+        autoAssignedLeads: assignedLeadsCount,
       },
     });
   } catch (err) {
