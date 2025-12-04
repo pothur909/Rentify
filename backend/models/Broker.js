@@ -20,6 +20,10 @@ const BrokerSchema = new mongoose.Schema(
     currentPackage: { type: mongoose.Schema.Types.ObjectId, ref: 'LeadPackage' },
     packagePurchasedAt: { type: Date },
     leadsAssigned: { type: Number, default: 0 },
+    fcmTokens: {
+      type: [String],
+      default: [],
+    },
   },
   { timestamps: true }
 );

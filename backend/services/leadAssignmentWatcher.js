@@ -2,6 +2,7 @@ const mongoose = require('mongoose');
 const Lead = require('../models/Lead');
 const Broker = require('../models/Broker');
 const AssignmentCursor = require('../models/AssignmentCursor');
+const { sendLeadAssignmentNotification } = require('./notificationService');
 
 async function assignLeadIfPossible(leadDoc) {
   if (!leadDoc) return;
@@ -66,6 +67,9 @@ async function assignLeadIfPossible(leadDoc) {
   // If lead was successfully assigned, increment broker's leadsAssigned counter
   if (updatedLead) {
     await Broker.findByIdAndUpdate(assignedTo, { $inc: { leadsAssigned: 1 } });
+    
+    // Send push notification to the broker
+    await sendLeadAssignmentNotification(assignedTo, updatedLead);
   }
 }
 
@@ -90,4 +94,4 @@ function startLeadAssignmentWatcher(conn) {
   }
 }
 
-module.exports = { startLeadAssignmentWatcher };
+module.exports = { startLeadAssignmentWatcher, assignLeadIfPossible };

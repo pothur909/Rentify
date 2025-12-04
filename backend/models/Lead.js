@@ -8,6 +8,8 @@ const LeadSchema = new mongoose.Schema(
     budget: { type: Number, required: false },
     propertyType: { type: String, trim: true }, 
     flatType: { type: String, required: false, trim: true },
+    furnishingType: { type: String, trim: true },   // Fully / Semi / Unfurnished
+    amenities: { type: [String], default: [] },  
     status: { type: String, enum: ['open', 'assigned', 'closed','contacted'], default: 'open' },
     areaKey: { type: String, trim: true },
     assignedTo: { type: mongoose.Schema.Types.ObjectId, ref: 'Broker' },

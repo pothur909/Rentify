@@ -557,17 +557,21 @@ const PROPERTY_TYPES = [
   'Villa',
   'PG / Co-living',
   'Plot / Land',
+  'Anything is fine',
 ];
 
 const BUDGET_RANGES = [
-  { label: 'Under ₹10,000', value: '0-10000' },
-  { label: '₹10,000 - ₹20,000', value: '10000-20000' },
-  { label: '₹20,000 - ₹30,000', value: '20000-30000' },
-  { label: '₹30,000 - ₹50,000', value: '30000-50000' },
-  { label: '₹50,000 - ₹75,000', value: '50000-75000' },
-  { label: '₹75,000 - ₹1,00,000', value: '75000-100000' },
-  { label: 'Above ₹1,00,000', value: '100000-above' },
+  { label: '₹10,000 - ₹15,000', value: '10000-15000' },
+  { label: '₹15,000 - ₹20,000', value: '15000-20000' },
+  { label: '₹20,000 - ₹25,000', value: '20000-25000' },
+  { label: '₹25,000 - ₹35,000', value: '25000-35000' },
+  { label: '₹35,000 - ₹50,000', value: '35000-50000' },
+  { label: 'Above ₹50,000', value: '50000-above' },
 ];
+
+const FURNISHING_TYPES = ['Fully Furnished', 'Semi Furnished', 'Unfurnished'];
+
+const AMENITIES = ['Parking', 'Security', 'Power backup', 'Lift', 'Balcony'];
 
 export default function EnquiryForm() {
   const [formData, setFormData] = useState({
@@ -578,6 +582,8 @@ export default function EnquiryForm() {
     flatType: '',
     areaKey: '',
     propertyType: '',
+  furnishingType: '',
+  amenities: [] as string[],
   });
 
   const [loading, setLoading] = useState(false);
@@ -596,6 +602,32 @@ export default function EnquiryForm() {
   const [selectedBaseArea, setSelectedBaseArea] = useState<string | null>(null);
   const [showSubLocations, setShowSubLocations] = useState(false);
   const autocompleteRef = useRef<HTMLDivElement>(null);
+
+  const toggleAmenity = (amenity: string) => {
+  setFormData(prev => {
+    const exists = prev.amenities.includes(amenity);
+    return {
+      ...prev,
+      amenities: exists
+        ? prev.amenities.filter(a => a !== amenity)
+        : [...prev.amenities, amenity],
+    };
+  });
+};
+
+
+  const toggleAmenity = (amenity: string) => {
+  setFormData(prev => {
+    const exists = prev.amenities.includes(amenity);
+    return {
+      ...prev,
+      amenities: exists
+        ? prev.amenities.filter(a => a !== amenity)
+        : [...prev.amenities, amenity],
+    };
+  });
+};
+
 
   // Helper function to extract area name from address
   const extractAreaName = (displayName: string, address: any): string => {
@@ -791,13 +823,26 @@ export default function EnquiryForm() {
     setFormData({ ...formData, phoneNumber: value });
   };
 
+  // const handleChange = (
+  //   e: React.ChangeEvent<HTMLInputElement | HTMLTextAreaElement | HTMLSelectElement>
+  // ) => {
+  //   if (e.target.name === 'phoneNumber')
+  //     return handlePhoneChange(e as React.ChangeEvent<HTMLInputElement>);
+  //   setFormData({ ...formData, [e.target.name]: e.target.value });
+  // };
+
   const handleChange = (
-    e: React.ChangeEvent<HTMLInputElement | HTMLTextAreaElement | HTMLSelectElement>
-  ) => {
-    if (e.target.name === 'phoneNumber')
-      return handlePhoneChange(e as React.ChangeEvent<HTMLInputElement>);
-    setFormData({ ...formData, [e.target.name]: e.target.value });
-  };
+  e: React.ChangeEvent<HTMLInputElement | HTMLTextAreaElement | HTMLSelectElement>
+) => {
+  if (e.target.name === 'phoneNumber')
+    return handlePhoneChange(e as React.ChangeEvent<HTMLInputElement>);
+
+  setFormData(prev => ({
+    ...prev,
+    [e.target.name]: e.target.value,
+  }));
+};
+
 
   const handleAreaSelect = (location: { display_name: string; area_name: string; lat: string; lon: string; is_base_area: boolean }) => {
     // If this is a base area (no sector info), fetch sub-locations
@@ -814,73 +859,156 @@ export default function EnquiryForm() {
       address: 'Bangalore',
       areaKey: location.area_name,
     });
-    
-    // Clear everything and close dropdown
-    setLocationSuggestions([]); // Clear suggestions first
-    setSearchTerm(location.area_name);
-    setShowSuggestions(false); // Then close dropdown
-    setShowSubLocations(false);
-    setSelectedBaseArea(null);
+    setSearchTerm(area);
+    setShowSuggestions(false);
   };
+
+  // const handleSubmit = async () => {
+  //   setLoading(true);
+  //   setMessage(null);
+
+  //   if (formData.phoneNumber.length !== 10) {
+  //     setMessage({ type: 'error', text: 'Phone number must be exactly 10 digits' });
+  //     setLoading(false);
+  //     return;
+  //   }
+
+  //   let budgetValue: number | undefined;
+  //   if (formData.budget) {
+  //     const [min] = formData.budget.split('-');
+  //     budgetValue = parseInt(min);
+  //   }
+
+  //   try {
+  //     const response = await fetch(`${baseurl}/api/leads`, {
+  //       method: 'POST',
+  //       headers: { 'Content-Type': 'application/json' },
+  //       body: JSON.stringify({
+  //         name: formData.name,
+  //         phoneNumber: '+91' + formData.phoneNumber,
+  //         address: formData.address || 'Bangalore',
+  //         budget: budgetValue,
+  //         flatType: formData.flatType,
+  //         areaKey: formData.areaKey,
+  //         propertyType: formData.propertyType,
+  //       }),
+  //     });
+
+  //     const data = await response.json();
+
+  //     if (response.ok) {
+  //       setMessage({
+  //         type: 'success',
+  //         text: 'Enquiry submitted successfully. We will contact you soon.',
+  //       });
+  //       setFormData({
+  //         name: '',
+  //         phoneNumber: '',
+  //         address: '',
+  //         budget: '',
+  //         flatType: '',
+  //         areaKey: '',
+  //         propertyType: '',
+  //       });
+  //       setSearchTerm('');
+  //     } else {
+  //       setMessage({ type: 'error', text: data.message || 'Something went wrong.' });
+  //     }
+  //   } catch (err) {
+  //     console.error(err);
+  //     setMessage({ type: 'error', text: 'Network error. Please try again.' });
+  //   } finally {
+  //     setLoading(false);
+  //   }
+  // };
 
   const handleSubmit = async () => {
-    setLoading(true);
-    setMessage(null);
+  setLoading(true);
+  setMessage(null);
 
-    if (formData.phoneNumber.length !== 10) {
-      setMessage({ type: 'error', text: 'Phone number must be exactly 10 digits' });
-      setLoading(false);
-      return;
-    }
+  if (formData.phoneNumber.length !== 10) {
+    setMessage({ type: 'error', text: 'Phone number must be exactly 10 digits' });
+    setLoading(false);
+    return;
+  }
 
-    let budgetValue: number | undefined;
-    if (formData.budget) {
-      const [min] = formData.budget.split('-');
-      budgetValue = parseInt(min);
-    }
+  if (!formData.propertyType) {
+    setMessage({ type: 'error', text: 'Please select a property type' });
+    setLoading(false);
+    return;
+  }
 
-    try {
-      const response = await fetch(`${baseurl}/api/leads`, {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
-          name: formData.name,
-          phoneNumber: '+91' + formData.phoneNumber,
-          address: formData.address || 'Bangalore',
-          budget: budgetValue,
-          flatType: formData.flatType,
-          areaKey: formData.areaKey,
-          propertyType: formData.propertyType,
-        }),
+  if (!formData.flatType) {
+    setMessage({ type: 'error', text: 'Please select a BHK / flat type' });
+    setLoading(false);
+    return;
+  }
+
+  if (!formData.areaKey) {
+    setMessage({ type: 'error', text: 'Please select a preferred location' });
+    setLoading(false);
+    return;
+  }
+
+  if (!formData.budget) {
+    setMessage({ type: 'error', text: 'Please select a budget range' });
+    setLoading(false);
+    return;
+  }
+
+  let budgetValue: number | undefined;
+  if (formData.budget) {
+    const [min] = formData.budget.split('-');
+    budgetValue = parseInt(min);
+  }
+
+  try {
+    const response = await fetch(`${baseurl}/api/leads`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        name: formData.name,
+        phoneNumber: '+91' + formData.phoneNumber,
+        address: formData.address || 'Bangalore',
+        budget: budgetValue,
+        flatType: formData.flatType,
+        areaKey: formData.areaKey,
+        propertyType: formData.propertyType,
+        furnishingType: formData.furnishingType || undefined,
+        amenities: formData.amenities,
+      }),
+    });
+
+    const data = await response.json();
+
+    if (response.ok) {
+      setMessage({
+        type: 'success',
+        text: 'Enquiry submitted successfully. We will contact you soon.',
       });
-
-      const data = await response.json();
-
-      if (response.ok) {
-        setMessage({
-          type: 'success',
-          text: 'Enquiry submitted successfully. We will contact you soon.',
-        });
-        setFormData({
-          name: '',
-          phoneNumber: '',
-          address: '',
-          budget: '',
-          flatType: '',
-          areaKey: '',
-          propertyType: '',
-        });
-        setSearchTerm('');
-      } else {
-        setMessage({ type: 'error', text: data.message || 'Something went wrong.' });
-      }
-    } catch (err) {
-      console.error(err);
-      setMessage({ type: 'error', text: 'Network error. Please try again.' });
-    } finally {
-      setLoading(false);
+      setFormData({
+        name: '',
+        phoneNumber: '',
+        address: '',
+        budget: '',
+        flatType: '',
+        areaKey: '',
+        propertyType: '',
+        furnishingType: '',
+        amenities: [],
+      });
+      setSearchTerm('');
+    } else {
+      setMessage({ type: 'error', text: data.message || 'Something went wrong.' });
     }
-  };
+  } catch (err) {
+    console.error(err);
+    setMessage({ type: 'error', text: 'Network error. Please try again.' });
+  } finally {
+    setLoading(false);
+  }
+};
+
 
   const FloatingElement = ({ delay = 0, duration = 3 }) => (
     <div
@@ -1171,6 +1299,58 @@ export default function EnquiryForm() {
                     </div>
                   </div>
                 </div>
+
+                <div>
+  <label className="flex items-center text-xs md:text-sm font-semibold text-gray-700 mb-2">
+    <Home className="w-4 h-4 mr-2 text-blue-600" />
+    Furnishing (optional)
+  </label>
+  <div className="relative">
+    <select
+      name="furnishingType"
+      value={formData.furnishingType}
+      onChange={handleChange}
+      className="w-full px-3 md:px-4 py-2.5 md:py-3 border-2 border-gray-200 rounded-xl focus:border-blue-500 focus:outline-none transition-colors appearance-none bg-white cursor-pointer text-sm md:text-base text-black"
+    >
+      <option value="">Select furnishing</option>
+      {FURNISHING_TYPES.map(t => (
+        <option key={t} value={t}>
+          {t}
+        </option>
+      ))}
+    </select>
+    {/* arrow svg */}
+  </div>
+</div>
+
+<div>
+  <label className="flex items-center text-xs md:text-sm font-semibold text-gray-700 mb-2">
+    <Home className="w-4 h-4 mr-2 text-blue-600" />
+    Amenities (optional)
+  </label>
+  <div className="grid grid-cols-2 gap-2 md:gap-3">
+    {AMENITIES.map(a => (
+      <label
+        key={a}
+        className={`flex items-center space-x-2 px-2.5 py-2 rounded-lg border text-xs md:text-sm cursor-pointer ${
+          formData.amenities.includes(a)
+            ? 'border-blue-500 bg-blue-50 text-blue-700'
+            : 'border-gray-200 bg-white text-gray-700'
+        }`}
+      >
+        <input
+          type="checkbox"
+          className="accent-blue-600"
+          checked={formData.amenities.includes(a)}
+          onChange={() => toggleAmenity(a)}
+        />
+        <span>{a}</span>
+      </label>
+    ))}
+  </div>
+</div>
+
+
 
                 {/* Budget */}
                 <div>
