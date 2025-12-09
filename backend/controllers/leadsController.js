@@ -1311,56 +1311,82 @@ exports.bulkCreateLeads = async (req, res, next) => {
 
 
 
-const CONTACT_HISTORY_STATUSES = [
-  'not_reachable',
-  'not_received_call',
-  'contacted',
-  'pending_contacted_not_interested',
-];
 
-exports.addContactHistoryEntry = async (req, res, next) => {
+exports.addContactHistoryEntry = async (req, res) => {
   try {
     const { leadId } = req.params;
     const { status, note } = req.body;
 
-    if (!leadId) {
-      return res.status(400).json({ message: 'leadId is required' });
+    const allowedStatuses = [
+      'call_completed',
+      'not_answered',
+      'switched_off',
+      'invalid_or_wrong_number',
+      'call_later_requested',
+      'lead_converted',
+      'lead_not_converted',
+    ];
+
+    if (!status || !allowedStatuses.includes(status)) {
+      return res.status(400).json({
+        success: false,
+        message: 'Invalid status',
+      });
     }
 
-    if (!status || !CONTACT_HISTORY_STATUSES.includes(status)) {
+    // feedback required
+    if (status === 'lead_not_converted' && (!note || !note.trim())) {
       return res.status(400).json({
-        message: `Invalid status. Allowed: ${CONTACT_HISTORY_STATUSES.join(', ')}`,
+        success: false,
+        message: 'Feedback note is required when lead is not converted',
       });
     }
 
     const lead = await Lead.findById(leadId);
     if (!lead) {
-      return res.status(404).json({ message: 'Lead not found' });
+      return res.status(404).json({
+        success: false,
+        message: 'Lead not found',
+      });
     }
 
-    // append only, do not edit or delete old entries
-    lead.contactHistory.push({
+    // 1. If lead is still open/assigned, block status update until reveal
+    if (lead.status === 'open' || lead.status === 'assigned') {
+      return res.status(400).json({
+        success: false,
+        message: 'You must reveal contact details before updating status',
+      });
+    }
+
+    // 2. If lead is already converted, lock further status changes
+    if (lead.status === 'lead_converted') {
+      return res.status(400).json({
+        success: false,
+        message: 'Lead already converted. Status cannot be changed',
+      });
+    }
+
+    const historyEntry = {
       status,
       note: note || '',
       createdAt: new Date(),
-    });
+    };
 
-    // DO NOT CHANGE lead.status HERE
+    lead.contactHistory.push(historyEntry);
+    // keep the latest status as the main pipeline status
+    lead.status = status;
+
     await lead.save();
 
-    const latest = lead.contactHistory[lead.contactHistory.length - 1];
-
     return res.json({
-      message: 'Contact history entry added',
-      data: {
-        _id: lead._id,
-        status: lead.status,  // main status unchanged
-        latestContactHistory: latest,
-        contactHistoryCount: lead.contactHistory.length,
-      },
+      success: true,
+      data: lead,
     });
   } catch (err) {
-    next(err);
+    console.error('Error in addContactHistoryEntry:', err);
+    return res.status(500).json({
+      success: false,
+      message: 'Server error while updating contact history',
+    });
   }
 };
-

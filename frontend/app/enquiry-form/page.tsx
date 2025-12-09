@@ -846,13 +846,8 @@ export default function EnquiryForm() {
       address: 'Bangalore',
       areaKey: location.area_name,
     });
-    
-    // Clear everything and close dropdown
-    setLocationSuggestions([]); // Clear suggestions first
     setSearchTerm(location.area_name);
-    setShowSuggestions(false); // Then close dropdown
-    setShowSubLocations(false);
-    setSelectedBaseArea(null);
+    setShowSuggestions(false);
   };
 
   // const handleSubmit = async () => {
@@ -1258,7 +1253,7 @@ export default function EnquiryForm() {
                 <div>
                   <label className="flex items-center text-xs md:text-sm font-semibold text-gray-700 mb-2">
                     <Key className="w-4 h-4 mr-2 text-blue-600" />
-                    BHK / Flat Type (optional)
+                    BHK / Flat Type
                   </label>
                   <div className="relative">
                     <select

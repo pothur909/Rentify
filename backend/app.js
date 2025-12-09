@@ -7,17 +7,21 @@ var logger = require('morgan');
 var mongoose = require('mongoose');
 var { startLeadAssignmentWatcher } = require('./services/leadAssignmentWatcher');
 var { startStaleLeadReassignment } = require('./services/staleLeadReassignment');
+var { initializeFirebase } = require('./services/notificationService');
 
 var indexRouter = require('./routes/index');
 var usersRouter = require('./routes/users');
 var leadsRouter = require('./routes/leads');
 var brokersRouter = require('./routes/brokers');
 const razorPaymentRouter = require('./routes/razorPayment.routs');
-const leadPackageRouter = require('./routes/leadPackage.routes');
+const leadPackageRouter = require('./routes/leadPackage.routes')
+var s3Router = require('./routes/s3');
+
 
 
 var packagesRouter = require('./routes/packages');
 var subAdminsRouter = require('./routes/subAdmins');
+var notificationsRouter = require('./routes/notifications');
 const cors = require('cors');
 
 var app = express();
@@ -79,6 +83,8 @@ mongoose
     if (process.env.NODE_ENV !== 'test') {
       console.log('MongoDB connected');
     }
+    // Initialize Firebase for push notifications
+    initializeFirebase();
     // Start change stream watcher for leads assignment
     startLeadAssignmentWatcher(mongoose.connection);
     // Start scheduled job for stale lead reassignment
@@ -96,6 +102,8 @@ app.use('/api/payments', razorPaymentRouter);
 app.use('/api/lead-packages', leadPackageRouter);
 app.use('/api/packages', packagesRouter);
 app.use('/api/sub-admins', subAdminsRouter);
+app.use('/api/notifications', notificationsRouter);
+app.use('/api/s3', s3Router);
 
 // catch 404 and forward to error handler
 app.use(function(req, res, next) {

@@ -1,7 +1,8 @@
 var express = require('express');
 var router = express.Router();
-const { createLead, addRemark, updateStatus, revealContactDetails, getAllLeadsForAdmin, assignOpenLeadsToBroker, reassignLeadsToAnotherBroker, bulkCreateLeads, checkStaleLeads, getBrokersByArea,   addContactHistoryEntry,     // NEW
+const { createLead, addRemark, updateStatus, revealContactDetails, getAllLeadsForAdmin, assignOpenLeadsToBroker, reassignLeadsToAnotherBroker, bulkCreateLeads, getBrokersByArea,   addContactHistoryEntry,     // NEW
  } = require('../controllers/leadsController');
+const { manualAssignLead } = require('../controllers/manualAssignController');
 const multer = require('multer');
 const upload = multer(); // uses memory storage
 
@@ -12,6 +13,7 @@ router.put('/:leadId/status', updateStatus);
 router.put('/:leadId/reveal', revealContactDetails);
 router.post('/assign-to-broker', assignOpenLeadsToBroker);
 router.post('/reassign-leads', reassignLeadsToAnotherBroker);
+router.post('/manual-assign', manualAssignLead); // NEW: Manual assign endpoint
 
 router.get('/by-area', getBrokersByArea);
 
