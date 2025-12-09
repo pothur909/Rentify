@@ -14,7 +14,9 @@ var usersRouter = require('./routes/users');
 var leadsRouter = require('./routes/leads');
 var brokersRouter = require('./routes/brokers');
 const razorPaymentRouter = require('./routes/razorPayment.routs');
-const leadPackageRouter = require('./routes/leadPackage.routes');
+const leadPackageRouter = require('./routes/leadPackage.routes')
+var s3Router = require('./routes/s3');
+
 
 
 var packagesRouter = require('./routes/packages');
@@ -101,6 +103,7 @@ app.use('/api/lead-packages', leadPackageRouter);
 app.use('/api/packages', packagesRouter);
 app.use('/api/sub-admins', subAdminsRouter);
 app.use('/api/notifications', notificationsRouter);
+app.use('/api/s3', s3Router);
 
 // catch 404 and forward to error handler
 app.use(function(req, res, next) {

@@ -163,7 +163,7 @@ exports.verifyOtp = async (req, res) => {
         address: broker.address,
         monthlyFlatsAvailable: broker.monthlyFlatsAvailable,   // NEW
         customerExpectations: broker.customerExpectations,
-         profileImageUrl: broker.profileImageUrl || null,
+         profilePicture: broker.profilePicture || null, 
       }
     });
   } catch (err) {
@@ -172,6 +172,88 @@ exports.verifyOtp = async (req, res) => {
   }
 };
 
+
+// exports.getAssignedLeads = async (req, res, next) => {
+//   try {
+//     const { brokerId } = req.params;
+    
+//     if (!brokerId) {
+//       return res.status(400).json({ message: 'brokerId is required' });
+//     }
+
+//     // Verify broker exists and populate package
+//     const broker = await Broker.findById(brokerId).populate('currentPackage');
+//     if (!broker) {
+//       return res.status(404).json({ message: 'Broker not found' });
+//     }
+
+//     // Get all leads assigned to this broker
+//     const leads = await Lead.find({ assignedTo: brokerId })
+//       .sort({ assignedAt: -1 }); // Sort by most recently assigned first
+
+//     // Calculate remaining leads
+//     const leadsRemaining = broker.currentPackage 
+//       ? broker.currentPackage.leadsCount - broker.leadsAssigned 
+//       : 0;
+
+//     // return res.json({ 
+//     //   message: 'Assigned leads retrieved successfully',
+//     //   count: leads.length,
+//     //   data: leads.map(lead => {
+//     //     const isContacted = lead.status === 'contacted';
+//     //     return {
+//     //       ...lead.toObject(),
+//     //       name: isContacted ? lead.name : null,
+//     //       phoneNumber: isContacted ? lead.phoneNumber : null
+//     //     };
+//     //   }),
+//     //   packageInfo: broker.currentPackage ? {
+//     //     packageName: broker.currentPackage.name,
+//     //     leadLimit: broker.currentPackage.leadLimit,
+//     //     leadsAssigned: broker.leadsAssigned,
+//     //     leadsRemaining: leadsRemaining
+//     //   } : null
+//     // });
+
+//     return res.json({
+//   message: 'Assigned leads retrieved successfully',
+//   count: leads.length,
+//   data: leads.map(lead => {
+//     const plain = lead.toObject();
+//     const isContacted = plain.status === 'contacted';
+
+//     const history = plain.contactHistory || [];
+//     const latestContactHistory =
+//       history.length > 0 ? history[history.length - 1] : null;
+
+//     return {
+//       ...plain,
+//       // main masking still depends only on main status
+//       name: isContacted ? plain.name : null,
+//       phoneNumber: isContacted ? plain.phoneNumber : null,
+//       latestContactHistory, // purely extra field
+//     };
+//   }),
+//   packageInfo: broker.currentPackage
+//     ? {
+//         packageName: broker.currentPackage.name,
+//         leadLimit: broker.currentPackage.leadLimit,
+//         leadsAssigned: broker.leadsAssigned,
+//         leadsRemaining: leadsRemaining,
+//       }
+//     : null,
+// });
+
+//   } catch (err) {
+//     next(err);
+//   }
+// };
+
+
+
+
+
+//////////purchase package controller is not in use and also the package import also const Package = require('../models/Package'); ////////////
 
 exports.getAssignedLeads = async (req, res, next) => {
   try {
@@ -188,72 +270,55 @@ exports.getAssignedLeads = async (req, res, next) => {
     }
 
     // Get all leads assigned to this broker
-    const leads = await Lead.find({ assignedTo: brokerId })
-      .sort({ assignedAt: -1 }); // Sort by most recently assigned first
+    const leads = await Lead.find({ assignedTo: brokerId }).sort({ assignedAt: -1 });
 
     // Calculate remaining leads
     const leadsRemaining = broker.currentPackage 
       ? broker.currentPackage.leadsCount - broker.leadsAssigned 
       : 0;
 
-    // return res.json({ 
-    //   message: 'Assigned leads retrieved successfully',
-    //   count: leads.length,
-    //   data: leads.map(lead => {
-    //     const isContacted = lead.status === 'contacted';
-    //     return {
-    //       ...lead.toObject(),
-    //       name: isContacted ? lead.name : null,
-    //       phoneNumber: isContacted ? lead.phoneNumber : null
-    //     };
-    //   }),
-    //   packageInfo: broker.currentPackage ? {
-    //     packageName: broker.currentPackage.name,
-    //     leadLimit: broker.currentPackage.leadLimit,
-    //     leadsAssigned: broker.leadsAssigned,
-    //     leadsRemaining: leadsRemaining
-    //   } : null
-    // });
+    // Only mask when effective status is open or assigned
+    const data = leads.map(lead => {
+      const plain = lead.toObject();
+
+      const history = plain.contactHistory || [];
+      const latestContactHistory =
+        history.length > 0 ? history[history.length - 1] : null;
+
+      // effective status: use latest history if present, else main status
+      const effectiveStatus = latestContactHistory?.status || plain.status;
+
+      const shouldMask =
+        effectiveStatus === 'open' || effectiveStatus === 'assigned';
+
+      return {
+        ...plain,
+        // Only hide for open / assigned, show real for everything else
+        name: shouldMask ? null : plain.name,
+        phoneNumber: shouldMask ? null : plain.phoneNumber,
+        latestContactHistory,
+      };
+    });
 
     return res.json({
-  message: 'Assigned leads retrieved successfully',
-  count: leads.length,
-  data: leads.map(lead => {
-    const plain = lead.toObject();
-    const isContacted = plain.status === 'contacted';
-
-    const history = plain.contactHistory || [];
-    const latestContactHistory =
-      history.length > 0 ? history[history.length - 1] : null;
-
-    return {
-      ...plain,
-      // main masking still depends only on main status
-      name: isContacted ? plain.name : null,
-      phoneNumber: isContacted ? plain.phoneNumber : null,
-      latestContactHistory, // purely extra field
-    };
-  }),
-  packageInfo: broker.currentPackage
-    ? {
-        packageName: broker.currentPackage.name,
-        leadLimit: broker.currentPackage.leadLimit,
-        leadsAssigned: broker.leadsAssigned,
-        leadsRemaining: leadsRemaining,
-      }
-    : null,
-});
-
+      message: 'Assigned leads retrieved successfully',
+      count: leads.length,
+      data,
+      packageInfo: broker.currentPackage
+        ? {
+            packageName: broker.currentPackage.name,
+            // be consistent with your package schema: use leadsCount, not leadLimit
+            leadLimit: broker.currentPackage.leadsCount,
+            leadsAssigned: broker.leadsAssigned,
+            leadsRemaining: leadsRemaining,
+          }
+        : null,
+    });
   } catch (err) {
     next(err);
   }
 };
 
-
-
-
-
-//////////purchase package controller is not in use and also the package import also const Package = require('../models/Package'); ////////////
 
 exports.purchasePackage = async (req, res, next) => {
   try {
@@ -505,6 +570,104 @@ exports.getBrokerDashboardStats = async (req, res, next) => {
           remainingCapacity,         // this is your "upcoming" for UI
           totalPurchased: totalPaidPackages,
         },
+      },
+    });
+  } catch (err) {
+    next(err);
+  }
+};
+
+
+
+exports.updateBrokerProfile = async (req, res, next) => {
+  try {
+    const { brokerId } = req.params;
+
+    if (!brokerId) {
+      return res.status(400).json({ message: "brokerId is required" });
+    }
+
+    const {
+      name,
+      serviceAreas,
+      availableFlatTypes,
+      address,
+      monthlyFlatsAvailable,
+      customerExpectations,
+       profilePicture,
+    } = req.body;
+
+    const broker = await Broker.findById(brokerId);
+    if (!broker) {
+      return res.status(404).json({ message: "Broker not found" });
+    }
+
+    // do not allow phone change
+    if (
+      req.body.phoneNumber &&
+      req.body.phoneNumber !== broker.phoneNumber
+    ) {
+      return res
+        .status(400)
+        .json({ message: "Phone number cannot be changed from profile" });
+    }
+
+    if (typeof name === "string") {
+      broker.name = name.trim();
+    }
+
+    if (address !== undefined) {
+      broker.address = address || "";
+    }
+
+    // arrays
+    if (serviceAreas !== undefined) {
+      const areasArray = Array.isArray(serviceAreas)
+        ? serviceAreas
+        : [serviceAreas];
+      broker.serviceAreas = areasArray
+        .map(a => (a || "").trim())
+        .filter(a => a.length > 0);
+    }
+
+    if (availableFlatTypes !== undefined) {
+      const flatsArray = Array.isArray(availableFlatTypes)
+        ? availableFlatTypes
+        : [availableFlatTypes];
+      broker.availableFlatTypes = flatsArray
+        .map(f => (f || "").trim())
+        .filter(f => f.length > 0);
+    }
+
+    if (monthlyFlatsAvailable !== undefined) {
+      const num = Number(monthlyFlatsAvailable);
+      broker.monthlyFlatsAvailable =
+        Number.isFinite(num) && num >= 0 ? num : 0;
+    }
+
+    if (customerExpectations !== undefined) {
+      broker.customerExpectations = customerExpectations || "";
+    }
+
+     if (profilePicture !== undefined) {
+      broker.profilePicture = profilePicture || null;
+    }
+
+
+    const saved = await broker.save();
+
+    return res.json({
+      message: "Profile updated successfully",
+      data: {
+        _id: saved._id,
+        name: saved.name,
+        phoneNumber: saved.phoneNumber,
+        serviceAreas: saved.serviceAreas,
+        availableFlatTypes: saved.availableFlatTypes,
+        address: saved.address,
+        monthlyFlatsAvailable: saved.monthlyFlatsAvailable,
+        customerExpectations: saved.customerExpectations,
+        profilePicture: saved.profilePicture || null,
       },
     });
   } catch (err) {
