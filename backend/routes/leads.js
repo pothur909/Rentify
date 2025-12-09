@@ -1,6 +1,7 @@
 var express = require('express');
 var router = express.Router();
-const { createLead, addRemark, updateStatus, revealContactDetails, getAllLeadsForAdmin, assignOpenLeadsToBroker, reassignLeadsToAnotherBroker, bulkCreateLeads, getBrokersByArea } = require('../controllers/leadsController');
+const { createLead, addRemark, updateStatus, revealContactDetails, getAllLeadsForAdmin, assignOpenLeadsToBroker, reassignLeadsToAnotherBroker, bulkCreateLeads, getBrokersByArea,   addContactHistoryEntry,     // NEW
+ } = require('../controllers/leadsController');
 const { manualAssignLead } = require('../controllers/manualAssignController');
 const multer = require('multer');
 const upload = multer(); // uses memory storage
@@ -21,6 +22,11 @@ router.post(
   upload.single('file'),
  bulkCreateLeads
 );
+
+// router.post('/check-stale', checkStaleLeads);
+
+router.put('/:leadId/contact-history', addContactHistoryEntry);
+
 
 
 module.exports = router;

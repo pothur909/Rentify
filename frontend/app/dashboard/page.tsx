@@ -207,48 +207,86 @@ setStats({
     loadStats();
   }, [broker?._id]);
 
-  const cards = [
-    {
-      title: "Total Leads",
-      value: stats.totalLeads,
-      icon: Users,
-      gradient: "from-blue-500 to-blue-600",
-      bg: "bg-blue-50",
-      iconBg: "bg-blue-500",
-      change: "+12%",
-      changeType: "increase",
-    },
-    {
-      title: "Contacted Leads",
-      value: stats.contactedLeads,
-      icon: TrendingUp,
-      gradient: "from-purple-500 to-purple-600",
-      bg: "bg-purple-50",
-      iconBg: "bg-purple-500",
-      change: "+8%",
-      changeType: "increase",
-    },
-    // {
-    //   title: "Upcoming  Leads",
-    //   value: stats.upcomingLeads,
-    //   icon: CheckCircle,
-    //   gradient: "from-green-500 to-green-600",
-    //   bg: "bg-green-50",
-    //   iconBg: "bg-green-500",
-    //   change: "+15%",
-    //   changeType: "increase",
-    // },
-    {
-      title: "Total Packages",
-      value: stats.totalPackages,
-      icon: Package,
-      gradient: "from-orange-500 to-orange-600",
-      bg: "bg-orange-50",
-      iconBg: "bg-orange-500",
-      change: "+3",
-      changeType: "increase",
-    },
-  ];
+  // const cards = [
+  //   {
+  //     title: "Total Leads",
+  //     value: stats.totalLeads,
+  //     icon: Users,
+  //     gradient: "from-blue-500 to-blue-600",
+  //     bg: "bg-blue-50",
+  //     iconBg: "bg-blue-500",
+  //     change: "+12%",
+  //     changeType: "increase",
+  //   },
+  //   {
+  //     title: "Contacted Leads",
+  //     value: stats.contactedLeads,
+  //     icon: TrendingUp,
+  //     gradient: "from-purple-500 to-purple-600",
+  //     bg: "bg-purple-50",
+  //     iconBg: "bg-purple-500",
+  //     change: "+8%",
+  //     changeType: "increase",
+  //   },
+  //   // {
+  //   //   title: "Upcoming  Leads",
+  //   //   value: stats.upcomingLeads,
+  //   //   icon: CheckCircle,
+  //   //   gradient: "from-green-500 to-green-600",
+  //   //   bg: "bg-green-50",
+  //   //   iconBg: "bg-green-500",
+  //   //   change: "+15%",
+  //   //   changeType: "increase",
+  //   // },
+  //   {
+  //     title: "Total Packages",
+  //     value: stats.totalPackages,
+  //     icon: Package,
+  //     gradient: "from-orange-500 to-orange-600",
+  //     bg: "bg-orange-50",
+  //     iconBg: "bg-orange-500",
+  //     change: "+3",
+  //     changeType: "increase",
+  //   },
+  // ];
+
+
+   const cards = [
+  {
+    title: "Total Leads",
+    value: stats.totalLeads,
+    icon: Users,
+    gradient: "from-blue-500 to-blue-600",
+    bg: "bg-blue-50",
+    iconBg: "bg-blue-500",
+    change: "+12%",
+    changeType: "increase",
+    href: "/dashboard/leads",
+  },
+  {
+    title: "Contacted Leads",
+    value: stats.contactedLeads,
+    icon: TrendingUp,
+    gradient: "from-purple-500 to-purple-600",
+    bg: "bg-purple-50",
+    iconBg: "bg-purple-500",
+    change: "+8%",
+    changeType: "increase",
+    href: "/dashboard/leads",
+  },
+  {
+    title: "Total Packages",
+    value: stats.totalPackages,
+    icon: Package,
+    gradient: "from-orange-500 to-orange-600",
+    bg: "bg-orange-50",
+    iconBg: "bg-orange-500",
+    change: "+3",
+    changeType: "increase",
+    href: "/dashboard/packages",
+  },
+];
+
 
   const mobileMenu = [
     { label: "Overview", href: "/dashboard", icon: LayoutGrid },
@@ -315,6 +353,7 @@ setStats({
         {cards.map((card) => (
           <div
             key={card.title}
+            onClick={() => router.push(card.href)}
             className={`${card.bg} rounded-2xl p-4 lg:p-6 shadow-md hover:shadow-xl transition-all duration-300 transform hover:-translate-y-1 border border-gray-100`}
           >
             <div className="flex items-start justify-between mb-4">
@@ -344,8 +383,8 @@ setStats({
       </div>
 
       {/* Recent Activity Section */}
-      <div className="mt-8 grid grid-cols-1 lg:grid-cols-2 gap-6">
-        {/* Quick Stats */}
+      {/* <div className="mt-8 grid grid-cols-1 lg:grid-cols-2 gap-6">
+        {/* Quick Stats 
         <div className="bg-white rounded-2xl p-5 lg:p-6 shadow-md border border-gray-100">
           <h2 className="text-lg lg:text-xl font-bold text-gray-900 mb-4">
             Quick Stats
@@ -378,7 +417,7 @@ setStats({
           </div>
         </div>
 
-        {/* Performance */}
+        {/* Performance *
         <div className="bg-gradient-to-br from-indigo-500 to-purple-600 rounded-2xl p-5 lg:p-6 shadow-md text-white">
           <h2 className="text-lg lg:text-xl font-bold mb-4">
             Performance
@@ -421,7 +460,7 @@ setStats({
             </p>
           </div>
         </div>
-      </div>
+      </div> */}
 
       {/* Mobile slide in menu */}
       {isMobileMenuOpen && (

@@ -616,19 +616,6 @@ export default function EnquiryForm() {
 };
 
 
-  const toggleAmenity = (amenity: string) => {
-  setFormData(prev => {
-    const exists = prev.amenities.includes(amenity);
-    return {
-      ...prev,
-      amenities: exists
-        ? prev.amenities.filter(a => a !== amenity)
-        : [...prev.amenities, amenity],
-    };
-  });
-};
-
-
   // Helper function to extract area name from address
   const extractAreaName = (displayName: string, address: any): string => {
     // Split the display name by commas
@@ -859,7 +846,7 @@ export default function EnquiryForm() {
       address: 'Bangalore',
       areaKey: location.area_name,
     });
-    setSearchTerm(area);
+    setSearchTerm(location.area_name);
     setShowSuggestions(false);
   };
 
@@ -1266,7 +1253,7 @@ export default function EnquiryForm() {
                 <div>
                   <label className="flex items-center text-xs md:text-sm font-semibold text-gray-700 mb-2">
                     <Key className="w-4 h-4 mr-2 text-blue-600" />
-                    BHK / Flat Type (optional)
+                    BHK / Flat Type
                   </label>
                   <div className="relative">
                     <select

@@ -1,6 +1,6 @@
 var express = require('express');
 var router = express.Router();
-const { signup, requestOtp, verifyOtp, getAssignedLeads, purchasePackage, getAllBrokersForAdmin, getBrokerDashboardStats } = require('../controllers/brokersController');
+const { signup, requestOtp, verifyOtp, getAssignedLeads, purchasePackage, getAllBrokersForAdmin, getBrokerDashboardStats, updateBrokerProfile } = require('../controllers/brokersController');
 
 // Admin route to get all brokers
 router.get('/admin/all', getAllBrokersForAdmin);
@@ -19,6 +19,8 @@ router.post('/:brokerId/purchase-package', purchasePackage);
 router.get('/:brokerId/assigned-leads', getAssignedLeads);
 
 router.get('/:brokerId/dashboard-stats', getBrokerDashboardStats);
+
+router.put('/:brokerId/profile', updateBrokerProfile);
 
 module.exports = router;
 

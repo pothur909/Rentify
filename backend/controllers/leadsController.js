@@ -1308,3 +1308,85 @@ exports.bulkCreateLeads = async (req, res, next) => {
     next(err);
   }
 };
+
+
+
+
+exports.addContactHistoryEntry = async (req, res) => {
+  try {
+    const { leadId } = req.params;
+    const { status, note } = req.body;
+
+    const allowedStatuses = [
+      'call_completed',
+      'not_answered',
+      'switched_off',
+      'invalid_or_wrong_number',
+      'call_later_requested',
+      'lead_converted',
+      'lead_not_converted',
+    ];
+
+    if (!status || !allowedStatuses.includes(status)) {
+      return res.status(400).json({
+        success: false,
+        message: 'Invalid status',
+      });
+    }
+
+    // feedback required
+    if (status === 'lead_not_converted' && (!note || !note.trim())) {
+      return res.status(400).json({
+        success: false,
+        message: 'Feedback note is required when lead is not converted',
+      });
+    }
+
+    const lead = await Lead.findById(leadId);
+    if (!lead) {
+      return res.status(404).json({
+        success: false,
+        message: 'Lead not found',
+      });
+    }
+
+    // 1. If lead is still open/assigned, block status update until reveal
+    if (lead.status === 'open' || lead.status === 'assigned') {
+      return res.status(400).json({
+        success: false,
+        message: 'You must reveal contact details before updating status',
+      });
+    }
+
+    // 2. If lead is already converted, lock further status changes
+    if (lead.status === 'lead_converted') {
+      return res.status(400).json({
+        success: false,
+        message: 'Lead already converted. Status cannot be changed',
+      });
+    }
+
+    const historyEntry = {
+      status,
+      note: note || '',
+      createdAt: new Date(),
+    };
+
+    lead.contactHistory.push(historyEntry);
+    // keep the latest status as the main pipeline status
+    lead.status = status;
+
+    await lead.save();
+
+    return res.json({
+      success: true,
+      data: lead,
+    });
+  } catch (err) {
+    console.error('Error in addContactHistoryEntry:', err);
+    return res.status(500).json({
+      success: false,
+      message: 'Server error while updating contact history',
+    });
+  }
+};
