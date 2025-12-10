@@ -19,6 +19,8 @@ import {
   BookOpen,
   CreditCard,
   LogOut,
+  Bell,
+  Clock,
 } from "lucide-react";
 import { useState, useEffect } from "react";
 import { useAuthContext } from "@/app/context/AuthContext";
@@ -75,6 +77,12 @@ export default function LeadsPage() {
   const [conversionStatus, setConversionStatus] = useState("");
   const [contactNote, setContactNote] = useState("");
   const [savingStatus, setSavingStatus] = useState(false);
+
+  // Reminder modal state
+  const [showReminderModal, setShowReminderModal] = useState(false);
+  const [selectedLeadForReminder, setSelectedLeadForReminder] = useState<any | null>(null);
+  const [reminderTime, setReminderTime] = useState("");
+  const [reminderMessage, setReminderMessage] = useState("");
 
   const mobileMenu = [
     { label: "Overview", href: "/dashboard", icon: LayoutGrid },
@@ -371,6 +379,55 @@ export default function LeadsPage() {
       closeRemarkModal();
     } catch (e) {
       console.error(e);
+    }
+  };
+
+  // Reminder handlers
+  const openReminderModal = (lead: any) => {
+    setSelectedLeadForReminder(lead);
+    setReminderTime("");
+    setReminderMessage("");
+    setShowReminderModal(true);
+  };
+
+  const closeReminderModal = () => {
+    setShowReminderModal(false);
+    setSelectedLeadForReminder(null);
+    setReminderTime("");
+    setReminderMessage("");
+  };
+
+  const handleSaveReminder = async () => {
+    if (!selectedLeadForReminder?._id || !broker?._id) return;
+    if (!reminderTime || !reminderMessage) {
+      alert("Please fill in both reminder time and message");
+      return;
+    }
+
+    try {
+      const res = await fetch(`${baseurl}/api/reminders`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          leadId: selectedLeadForReminder._id,
+          brokerId: broker._id,
+          reminderTime: new Date(reminderTime).toISOString(),
+          message: reminderMessage,
+        }),
+      });
+
+      const data = await res.json();
+
+      if (!res.ok) {
+        alert(data.message || "Failed to create reminder");
+        return;
+      }
+
+      alert("Reminder created successfully!");
+      closeReminderModal();
+    } catch (e) {
+      console.error(e);
+      alert("Failed to create reminder");
     }
   };
 
@@ -820,6 +877,14 @@ export default function LeadsPage() {
                           Remark
                         </button>
 
+                        <button
+                          onClick={() => openReminderModal(lead)}
+                          className="px-3 py-1 text-xs font-semibold text-orange-600 bg-orange-50 rounded-lg hover:bg-orange-100 transition-colors flex items-center gap-1"
+                        >
+                          <Bell className="w-3 h-3" />
+                          Remind
+                        </button>
+
                         <button className="p-2 hover:bg-gray-100 rounded-lg transition-colors duration-150">
                           <MoreVertical className="w-5 h-5 text-gray-400" />
                         </button>
@@ -921,6 +986,13 @@ export default function LeadsPage() {
                   className="flex-1 min-w-[80px] px-3 py-2 text-xs font-semibold text-purple-600 bg-purple-50 rounded-lg hover:bg-purple-100 transition-colors text-center"
                 >
                   Remark
+                </button>
+                <button
+                  onClick={() => openReminderModal(lead)}
+                  className="flex-1 min-w-[80px] px-3 py-2 text-xs font-semibold text-orange-600 bg-orange-50 rounded-lg hover:bg-orange-100 transition-colors flex items-center justify-center gap-1"
+                >
+                  <Bell className="w-3 h-3" />
+                  Remind
                 </button>
               </div>
             </div>
@@ -1036,6 +1108,78 @@ export default function LeadsPage() {
                 className="px-4 py-2 text-sm rounded-xl bg-blue-600 text-white hover:bg-blue-700"
               >
                 Save Remark
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* Reminder Modal */}
+      {showReminderModal && selectedLeadForReminder && (
+        <div className="fixed inset-0 bg-black/40 flex items-center justify-center z-50">
+          <div className="bg-white rounded-2xl shadow-xl w-full max-w-md p-6 relative">
+            <button
+              onClick={closeReminderModal}
+              className="absolute top-3 right-3 p-1 rounded-full hover:bg-gray-100"
+            >
+              <X className="w-5 h-5 text-gray-500" />
+            </button>
+            <h3 className="text-lg font-semibold text-gray-900 mb-2 flex items-center gap-2">
+              <Bell className="w-5 h-5 text-orange-600" />
+              Set Reminder
+            </h3>
+            <p className="text-sm text-gray-500 mb-4">
+              Lead: {maskName(selectedLeadForReminder)} |{" "}
+              {selectedLeadForReminder.address ||
+                selectedLeadForReminder.areaKey}
+            </p>
+            <div className="space-y-4">
+              <div>
+                <label className="block text-sm font-medium text-gray-700 mb-1">
+                  Reminder Time
+                </label>
+                <input
+                  type="datetime-local"
+                  value={reminderTime}
+                  onChange={e => setReminderTime(e.target.value)}
+                  min={new Date().toISOString().slice(0, 16)}
+                  className="w-full border border-gray-200 rounded-xl px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-orange-500 focus:border-transparent"
+                />
+              </div>
+              <div>
+                <label className="block text-sm font-medium text-gray-700 mb-1">
+                  Reminder Message
+                </label>
+                <textarea
+                  rows={4}
+                  value={reminderMessage}
+                  onChange={e => setReminderMessage(e.target.value)}
+                  placeholder="Type your reminder message here..."
+                  maxLength={500}
+                  className="w-full border border-gray-200 rounded-xl p-3 text-sm focus:outline-none focus:ring-2 focus:ring-orange-500 focus:border-transparent"
+                />
+                <p className="text-xs text-gray-400 mt-1">
+                  {reminderMessage.length}/500 characters
+                </p>
+              </div>
+            </div>
+            <div className="mt-4 flex justify-end gap-3">
+              <button
+                onClick={closeReminderModal}
+                className="px-4 py-2 text-sm rounded-xl border border-gray-200 text-gray-700 hover:bg-gray-50"
+              >
+                Cancel
+              </button>
+              <button
+                onClick={handleSaveReminder}
+                disabled={!reminderTime || !reminderMessage}
+                className={`px-4 py-2 text-sm rounded-xl text-white ${
+                  !reminderTime || !reminderMessage
+                    ? "bg-orange-300 cursor-not-allowed"
+                    : "bg-orange-600 hover:bg-orange-700"
+                }`}
+              >
+                Set Reminder
               </button>
             </div>
           </div>

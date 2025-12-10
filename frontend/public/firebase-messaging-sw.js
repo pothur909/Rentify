@@ -20,14 +20,18 @@ const messaging = firebase.messaging();
 messaging.onBackgroundMessage((payload) => {
   console.log('[firebase-messaging-sw.js] Received background message ', payload);
   
-  const notificationTitle = payload.notification?.title || 'New Lead Assigned';
+  // Use hosted logo from S3 for reliable notifications
+  const logoUrl = 'https://edusession-live.s3.ap-south-1.amazonaws.com/logo.jpg';
+  
+  const notificationTitle = payload.notification?.title || 'Rentify';
   const notificationOptions = {
-    body: payload.notification?.body || 'You have a new lead',
-    icon: '/favicon.ico',
-    badge: '/favicon.ico',
+    body: payload.notification?.body || 'You have a new notification',
+    icon: logoUrl,
+    badge: logoUrl,
     data: payload.data,
-    tag: 'lead-notification',
+    tag: payload.data?.type || 'rentify-notification',
     requireInteraction: true,
+    vibrate: [200, 100, 200]
   };
 
   self.registration.showNotification(notificationTitle, notificationOptions);
@@ -42,15 +46,23 @@ self.addEventListener('notificationclick', (event) => {
   // Open the app or focus existing window
   event.waitUntil(
     clients.matchAll({ type: 'window', includeUncontrolled: true }).then((clientList) => {
+      // Determine target URL based on notification type
+      let targetUrl = '/dashboard/leads';
+      
+      if (event.notification.data?.type === 'lead_reminder') {
+        targetUrl = '/dashboard/leads';
+      }
+      
       // If there's already a window open, focus it
       for (const client of clientList) {
         if (client.url.includes('/dashboard') && 'focus' in client) {
           return client.focus();
         }
       }
+      
       // Otherwise, open a new window
       if (clients.openWindow) {
-        return clients.openWindow('/dashboard');
+        return clients.openWindow(targetUrl);
       }
     })
   );
