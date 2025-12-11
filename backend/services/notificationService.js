@@ -144,9 +144,41 @@ async function removeFCMToken(brokerId, fcmToken) {
   }
 }
 
+/**
+ * Send a generic push notification to a specific FCM token
+ * @param {string} token - FCM token
+ * @param {string} title - Notification title
+ * @param {string} body - Notification body
+ * @param {object} data - Additional data payload
+ */
+async function sendPushNotification(token, title, body, data = {}) {
+  if (!firebaseInitialized) {
+    console.log('Firebase not initialized - skipping notification');
+    return;
+  }
+
+  try {
+    const message = {
+      notification: {
+        title: title,
+        body: body,
+      },
+      data: data,
+      token: token,
+    };
+
+    await admin.messaging().send(message);
+    console.log(`✅ Push notification sent: ${title}`);
+  } catch (error) {
+    console.error('Error sending push notification:', error.message);
+    throw error;
+  }
+}
+
 module.exports = {
   initializeFirebase,
   sendLeadAssignmentNotification,
   registerFCMToken,
   removeFCMToken,
+  sendPushNotification,
 };
