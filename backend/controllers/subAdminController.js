@@ -222,23 +222,86 @@ exports.getSubAdminById = async (req, res, next) => {
  * PUT /api/sub-admins/:subAdminId
  * Body: { name, email, password, phoneNumber, allowedRoutes, isActive }
  */
+// exports.updateSubAdmin = async (req, res, next) => {
+//   try {
+//     const { subAdminId } = req.params;
+//     const { name, email, password, phoneNumber, allowedRoutes, isActive } = req.body;
+
+//     const subAdmin = await SubAdmin.findById(subAdminId);
+//     if (!subAdmin) {
+//       return res.status(404).json({ message: 'Sub-admin not found' });
+//     }
+
+//     // Update fields
+//     if (name) subAdmin.name = name;
+//     if (email) subAdmin.email = email.toLowerCase();
+//     if (password) subAdmin.password = password; // Will be hashed by pre-save hook
+//     if (phoneNumber !== undefined) subAdmin.phoneNumber = phoneNumber;
+//     if (allowedRoutes) subAdmin.allowedRoutes = allowedRoutes;
+//     if (isActive !== undefined) subAdmin.isActive = isActive;
+
+//     await subAdmin.save();
+
+//     return res.json({
+//       message: 'Sub-admin updated successfully',
+//       data: {
+//         id: subAdmin._id,
+//         name: subAdmin.name,
+//         email: subAdmin.email,
+//         phoneNumber: subAdmin.phoneNumber,
+//         allowedRoutes: subAdmin.allowedRoutes,
+//         isActive: subAdmin.isActive
+//       }
+//     });
+//   } catch (err) {
+//     next(err);
+//   }
+// };
+
 exports.updateSubAdmin = async (req, res, next) => {
   try {
     const { subAdminId } = req.params;
-    const { name, email, password, phoneNumber, allowedRoutes, isActive } = req.body;
+    const {
+      name,
+      email,
+      password,
+      phoneNumber,
+      allowedRoutes,
+      isActive,
+    } = req.body;
 
     const subAdmin = await SubAdmin.findById(subAdminId);
     if (!subAdmin) {
       return res.status(404).json({ message: 'Sub-admin not found' });
     }
 
-    // Update fields
-    if (name) subAdmin.name = name;
-    if (email) subAdmin.email = email.toLowerCase();
-    if (password) subAdmin.password = password; // Will be hashed by pre-save hook
-    if (phoneNumber !== undefined) subAdmin.phoneNumber = phoneNumber;
-    if (allowedRoutes) subAdmin.allowedRoutes = allowedRoutes;
-    if (isActive !== undefined) subAdmin.isActive = isActive;
+    // Basic fields
+    if (typeof name === 'string' && name.trim()) {
+      subAdmin.name = name.trim();
+    }
+
+    if (typeof email === 'string' && email.trim()) {
+      subAdmin.email = email.toLowerCase().trim();
+    }
+
+    // Only change password if a non-empty string is sent
+    if (typeof password === 'string' && password.trim()) {
+      subAdmin.password = password; // pre-save hook will hash
+    }
+
+    if (phoneNumber !== undefined) {
+      subAdmin.phoneNumber = phoneNumber || '';
+    }
+
+    // Allowed routes must be an array
+    if (Array.isArray(allowedRoutes)) {
+      subAdmin.allowedRoutes = allowedRoutes;
+    }
+
+    // Active flag toggle
+    if (typeof isActive === 'boolean') {
+      subAdmin.isActive = isActive;
+    }
 
     await subAdmin.save();
 
@@ -250,13 +313,14 @@ exports.updateSubAdmin = async (req, res, next) => {
         email: subAdmin.email,
         phoneNumber: subAdmin.phoneNumber,
         allowedRoutes: subAdmin.allowedRoutes,
-        isActive: subAdmin.isActive
-      }
+        isActive: subAdmin.isActive,
+      },
     });
   } catch (err) {
     next(err);
   }
 };
+
 
 /**
  * Delete Sub-Admin (Admin Only)
