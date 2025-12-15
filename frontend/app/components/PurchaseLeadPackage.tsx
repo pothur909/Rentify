@@ -14,6 +14,7 @@ declare global {
 type Props = {
   brokerId: string;
   packageKey: string;
+  packageId: string;
   packageName: string;
   amount: number;
   supportsSubscription: boolean;
@@ -27,6 +28,7 @@ type SubInfo = {
 
 export default function PurchaseLeadPackage({
   brokerId,
+packageId,
   packageKey,
   packageName,
   amount,
@@ -172,7 +174,10 @@ export default function PurchaseLeadPackage({
     }
   };
 
-  const hasActiveSubscription = !!sub;
+//   const hasActiveSubscription = !!sub;
+const hasActiveSubscription =
+  !!sub && String(sub.packageId?._id || sub.packageId) === String(packageId);
+
 
   return (
     <div className="space-y-2">
