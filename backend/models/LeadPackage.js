@@ -73,6 +73,29 @@ const LeadPackageSchema = new mongoose.Schema(
       type: Boolean,
       default: true,
     },
+
+    supportsSubscription: {
+      type: Boolean,
+      default: true,
+    },
+    razorpayPlanId: {
+      type: String,
+      default: null, // set from Razorpay dashboard
+      trim: true,
+    },
+    billingInterval: {
+      type: Number,
+      default: 1, // 1 month
+    },
+    billingIntervalUnit: {
+      type: String,
+      enum: ['day', 'week', 'month', 'year'],
+      default: 'month',
+    },
+    autoRenewDefault: {
+      type: Boolean,
+      default: false,
+    },
   },
   { timestamps: true }
 );

@@ -30,6 +30,10 @@ const BrokerSchema = new mongoose.Schema(
       type: [String],
       default: [],
     },
+    currentLeadLimit: {
+  type: Number,
+  default: 0,
+},
   },
   { timestamps: true }
 );

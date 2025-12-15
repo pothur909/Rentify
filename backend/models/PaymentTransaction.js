@@ -78,6 +78,7 @@ const PaymentTransactionSchema = new mongoose.Schema(
     webhookLastEvent: {
       type: String,
     },
+      autoRenew: { type: Boolean, default: false }, // important
   },
   { timestamps: true }
 );
