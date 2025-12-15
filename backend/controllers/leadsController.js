@@ -1,6 +1,7 @@
 const Lead = require('../models/Lead');
 const Broker = require('../models/Broker');
 const AssignmentCursor = require('../models/AssignmentCursor');
+const { sendLeadAssignmentNotification } = require('../services/notificationService');
 
 const XLSX = require('xlsx');        // for Excel parsing
 const multer = require('multer'); 
@@ -188,6 +189,14 @@ exports.createLead = async (req, res, next) => {
 
     if (assignedTo) {
       await Broker.findByIdAndUpdate(assignedTo, { $inc: { leadsAssigned: 1 } });
+      
+      // Send push notification to the broker
+      try {
+        await sendLeadAssignmentNotification(assignedTo, lead);
+      } catch (notifError) {
+        console.error('Failed to send notification:', notifError.message);
+        // Continue even if notification fails
+      }
     }
 
     return res.status(201).json({ message: 'Lead created', data: lead });
@@ -1211,6 +1220,14 @@ async function createLeadForBulk(payload) {
 
   if (assignedTo) {
     await Broker.findByIdAndUpdate(assignedTo, { $inc: { leadsAssigned: 1 } });
+    
+    // Send push notification to the broker
+    try {
+      await sendLeadAssignmentNotification(assignedTo, lead);
+    } catch (notifError) {
+      console.error('Failed to send notification:', notifError.message);
+      // Continue even if notification fails
+    }
   }
 
   return lead;

@@ -5,12 +5,16 @@ const express = require('express');
 const router = express.Router();
 const {
   createOrder,
+  createCheckout,
   handleWebhook,
   getAllPayments,
+   getBrokerSubscription,
+  cancelBrokerSubscription,
 } = require('../controllers/razorPayment.controller');
 
 // create order
 router.post('/create-order', createOrder);
+router.post('/create-checkout', createCheckout);
 
 // webhook – raw parsing is done in app.js, we only consume it here
 router.post(
@@ -63,5 +67,8 @@ router.post(
 );
 
 router.get('/payments-list', getAllPayments);
+
+router.get("/my-subscription/:brokerId", getBrokerSubscription);
+router.post("/cancel-subscription", cancelBrokerSubscription);
 
 module.exports = router;

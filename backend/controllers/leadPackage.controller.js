@@ -171,6 +171,12 @@ exports.seedLeadPackages = async (req, res) => {
         bgClass: raw.bgClass || '',
         iconBgClass: raw.iconBgClass || '',
         iconKey: raw.iconKey || 'package',
+
+        supportsSubscription: raw.supportsSubscription ?? true,
+        razorpayPlanId: raw.razorpayPlanId || null,
+        billingInterval: raw.billingInterval ?? 1,
+        billingIntervalUnit: raw.billingIntervalUnit || 'month',
+        autoRenewDefault: raw.autoRenewDefault ?? false,
       };
 
       const updated = await LeadPackage.findOneAndUpdate(
@@ -262,6 +268,113 @@ exports.deleteLeadPackage = async (req, res) => {
       success: false,
       message: 'Failed to delete lead package',
       error: err.message,
+    });
+  }
+};
+
+
+
+const Razorpay = require("razorpay");
+
+const razorpay = new Razorpay({
+  key_id: process.env.RAZORPAY_KEY_ID,
+  key_secret: process.env.RAZORPAY_KEY_SECRET,
+});
+
+function normalizePlanPeriod(unit) {
+  const u = String(unit || "").toLowerCase().trim();
+
+  // allow both styles from DB/admin
+  if (u === "day" || u === "daily") return "daily";
+  if (u === "week" || u === "weekly") return "weekly";
+  if (u === "month" || u === "monthly") return "monthly";
+  if (u === "year" || u === "yearly") return "yearly";
+
+  return null;
+}
+
+// POST /api/lead-packages/:id/create-plan
+exports.createRazorpayPlanForPackage = async (req, res) => {
+  try {
+    const { id } = req.params;
+
+    const pkg = await LeadPackage.findById(id);
+    if (!pkg) {
+      return res.status(404).json({ success: false, message: "Package not found" });
+    }
+
+    if (!pkg.supportsSubscription) {
+      return res.status(400).json({
+        success: false,
+        message: "This package does not support subscriptions",
+      });
+    }
+
+    if (pkg.razorpayPlanId) {
+      return res.json({
+        success: true,
+        message: "Plan already exists",
+        razorpayPlanId: pkg.razorpayPlanId,
+      });
+    }
+
+    const period = normalizePlanPeriod(pkg.billingIntervalUnit);
+    if (!period) {
+      return res.status(400).json({
+        success: false,
+        message:
+          "Invalid billingIntervalUnit. Use day/week/month/year (or daily/weekly/monthly/yearly).",
+      });
+    }
+
+    const interval = Number(pkg.billingInterval || 1);
+    if (!Number.isFinite(interval) || interval <= 0) {
+      return res.status(400).json({
+        success: false,
+        message: "Invalid billingInterval. Must be a positive number.",
+      });
+    }
+
+    const amountPaise = Math.round(Number(pkg.price) * 100);
+    if (!Number.isFinite(amountPaise) || amountPaise <= 0) {
+      return res.status(400).json({
+        success: false,
+        message: "Invalid price. Must be a positive number.",
+      });
+    }
+
+    const plan = await razorpay.plans.create({
+      period, // daily|weekly|monthly|yearly
+      interval,
+      item: {
+        name: `${pkg.name} Subscription`,
+        amount: amountPaise,
+        currency: pkg.currency || "INR",
+        description: `Subscription for ${pkg.key}`,
+      },
+      notes: {
+        packageId: String(pkg._id),
+        packageKey: pkg.key,
+      },
+    });
+
+    pkg.razorpayPlanId = plan.id;
+    await pkg.save();
+
+    return res.json({
+      success: true,
+      message: "Plan created and saved",
+      razorpayPlanId: plan.id,
+      plan,
+    });
+  } catch (err) {
+    console.error("Plan creation error", err);
+    const msg =
+      err?.error?.description || err?.message || "Failed to create plan";
+    return res.status(500).json({
+      success: false,
+      message: "Failed to create plan",
+      error: msg,
     });
   }
 };

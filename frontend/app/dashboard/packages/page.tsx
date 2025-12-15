@@ -168,6 +168,11 @@
 //     { label: "Logout", href: "/logout", icon: LogOut, action: logout },
 //   ];
 
+//   const handleCallSales = () => {
+//     // opens dialer / call logs on mobile
+//     window.location.href = "tel:+919322645845";
+//   };
+
 //   return (
 //     <div className="text-gray-800 w-full max-w-full overflow-x-hidden">
 //       {/* Mobile header */}
@@ -178,9 +183,7 @@
 //             <p className="text-base font-semibold text-gray-900">
 //               {broker?.name || "Broker"}
 //             </p>
-//             <p className="text-xs text-gray-500">
-//               Lead packages
-//             </p>
+//             <p className="text-xs text-gray-500">Lead packages</p>
 //           </div>
 //           <button
 //             onClick={() => setIsMobileMenuOpen(true)}
@@ -353,14 +356,31 @@
 //       <div className="mt-8 bg-gradient-to-br from-indigo-500 to-purple-600 rounded-2xl p-6 lg:p-8 shadow-md text-white mx-4 lg:mx-0">
 //         <div className="text-center max-w-2xl mx-auto">
 //           <h2 className="text-xl lg:text-2xl font-bold mb-2">
-//             Need a Custom Package?
+//            Contact Support
 //           </h2>
-//           <p className="text-xs lg:text-sm text-indigo-100 mb-6">
+//           {/* <p className="text-xs lg:text-sm text-indigo-100 mb-4">
 //             Looking for something specific? We can create a tailored package
 //             that fits your exact requirements.
+//           </p> */}
+
+//           {/* Clickable phone that opens dialer / call logs */}
+//           <p className="text-sm lg:text-base mb-4">
+//             Call us at{" "}
+//             <button
+//               type="button"
+//               onClick={handleCallSales}
+//               className="underline font-semibold"
+//             >
+//               +91 93226 45845
+//             </button>
 //           </p>
-//           <button className="bg-white text-purple-600 px-6 lg:px-8 py-2.5 lg:py-3 rounded-xl font-semibold hover:shadow-lg transition-all duration-200 transform hover:scale-105 text-sm lg:text-base">
-//             Contact Sales Team
+
+//           <button
+//             className="bg-white text-purple-600 px-6 lg:px-8 py-2.5 lg:py-3 rounded-xl font-semibold hover:shadow-lg transition-all duration-200 transform hover:scale-105 text-sm lg:text-base"
+//             type="button"
+//             onClick={handleCallSales}
+//           >
+//             Call Support
 //           </button>
 //         </div>
 //       </div>
@@ -416,7 +436,7 @@
 //                         ? "bg-white text-blue-700 font-semibold"
 //                         : isLogout
 //                         ? "text-red-100 hover:bg-red-500/20"
-//                         : "text-white/90 hover:bg:white/10"
+//                         : "text-white/90 hover:bg-white/10"
 //                     }`}
 //                   >
 //                     <item.icon
@@ -440,8 +460,6 @@
 //   );
 // }
 
-
-
 "use client";
 
 import {
@@ -462,11 +480,10 @@ import {
   LogOut,
 } from "lucide-react";
 import { useEffect, useState } from "react";
-import RazorpayPackageButton from "../../components/RazorpayPackageButton";
+import PurchaseLeadPackage from "../../components/PurchaseLeadPackage";
 import { useAuthContext } from "../../context/AuthContext";
 import { useRouter, usePathname } from "next/navigation";
 
-// match your backend model
 type LeadPackageApi = {
   _id: string;
   key: string;
@@ -483,6 +500,8 @@ type LeadPackageApi = {
   popular: boolean;
   sortOrder: number;
   isActive: boolean;
+
+  supportsSubscription?: boolean;
 };
 
 type LeadPackageUI = {
@@ -498,9 +517,9 @@ type LeadPackageUI = {
   iconBg: string;
   features: string[];
   popular: boolean;
+  supportsSubscription: boolean;
 };
 
-// map iconKey from backend to actual icon component
 const iconMap: Record<string, typeof Package> = {
   package: Package,
   zap: Zap,
@@ -564,6 +583,7 @@ export default function PackagesPage() {
               iconBg: p.iconBgClass || "bg-gray-700",
               features: p.features || [],
               popular: !!p.popular,
+              supportsSubscription: p.supportsSubscription !== false,
             };
           });
 
@@ -612,13 +632,11 @@ export default function PackagesPage() {
   ];
 
   const handleCallSales = () => {
-    // opens dialer / call logs on mobile
     window.location.href = "tel:+919322645845";
   };
 
   return (
     <div className="text-gray-800 w-full max-w-full overflow-x-hidden">
-      {/* Mobile header */}
       <div className="lg:hidden sticky top-0 z-40 bg-white border-b border-gray-200 mb-4">
         <div className="flex items-center justify-between px-4 py-3">
           <div>
@@ -638,7 +656,6 @@ export default function PackagesPage() {
         </div>
       </div>
 
-      {/* Desktop header */}
       <div className="mb-8 hidden lg:block">
         <h1 className="text-3xl font-bold text-gray-900 mb-2">
           Lead Packages
@@ -648,7 +665,6 @@ export default function PackagesPage() {
         </p>
       </div>
 
-      {/* Mobile heading under header */}
       <div className="mb-4 lg:hidden px-4">
         <h1 className="text-2xl font-bold text-gray-900 mb-1">
           Lead Packages
@@ -658,7 +674,6 @@ export default function PackagesPage() {
         </p>
       </div>
 
-      {/* Stats Overview */}
       <div className="grid grid-cols-1 md:grid-cols-3 gap-4 lg:gap-6 mb-8 px-4 lg:px-0">
         {stats.map((stat) => (
           <div
@@ -682,7 +697,6 @@ export default function PackagesPage() {
         ))}
       </div>
 
-      {/* Loading / Error states */}
       {loading && (
         <div className="py-10 text-center text-gray-500 px-4 lg:px-0">
           Loading packages...
@@ -695,7 +709,6 @@ export default function PackagesPage() {
         </div>
       )}
 
-      {/* Packages Grid */}
       {!loading && !error && (
         <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-5 lg:gap-6 px-4 lg:px-0">
           {packages.map((pkg) => (
@@ -708,7 +721,6 @@ export default function PackagesPage() {
               }`}
               style={{ backgroundColor: "white" }}
             >
-              {/* Popular Badge */}
               {pkg.popular && (
                 <div className="absolute -top-3 left-1/2 transform -translate-x-1/2">
                   <span className="bg-gradient-to-r from-purple-500 to-purple-600 text-white text-xs font-bold px-4 py-1 rounded-full shadow-lg flex items-center gap-1">
@@ -718,7 +730,6 @@ export default function PackagesPage() {
                 </div>
               )}
 
-              {/* Package Icon */}
               <div
                 className={`${pkg.bg} w-16 h-16 rounded-xl flex items-center justify-center mb-4 mx-auto`}
               >
@@ -727,12 +738,10 @@ export default function PackagesPage() {
                 </div>
               </div>
 
-              {/* Package Name */}
               <h3 className="text-lg lg:text-xl font-bold text-gray-900 text-center mb-2">
                 {pkg.name}
               </h3>
 
-              {/* Price */}
               <div className="text-center mb-4">
                 <p
                   className={`text-3xl lg:text-4xl font-bold bg-gradient-to-r ${pkg.gradient} bg-clip-text text-transparent`}
@@ -745,7 +754,6 @@ export default function PackagesPage() {
                 </p>
               </div>
 
-              {/* Leads Count Badge */}
               <div className="bg-gradient-to-r from-gray-50 to-gray-100 rounded-xl p-3 lg:p-4 mb-4 text-center border border-gray-200">
                 <div className="flex items-center justify-center gap-2 mb-1">
                   <Users className="w-4 h-4 lg:w-5 lg:h-5 text-gray-600" />
@@ -758,7 +766,6 @@ export default function PackagesPage() {
                 </p>
               </div>
 
-              {/* Features List */}
               <ul className="space-y-2.5 lg:space-y-3 mb-5 lg:mb-6">
                 {pkg.features.map((feature, index) => (
                   <li
@@ -771,13 +778,14 @@ export default function PackagesPage() {
                 ))}
               </ul>
 
-              {/* CTA Button -> Razorpay */}
               {isAuthenticated && broker ? (
-                <RazorpayPackageButton
+                <PurchaseLeadPackage
                   brokerId={broker._id}
+                  packageId={pkg.id}
                   packageKey={pkg.key}
                   packageName={pkg.name}
                   amount={pkg.price}
+                  supportsSubscription={pkg.supportsSubscription}
                 />
               ) : (
                 <button
@@ -795,18 +803,12 @@ export default function PackagesPage() {
         </div>
       )}
 
-      {/* Contact Section */}
       <div className="mt-8 bg-gradient-to-br from-indigo-500 to-purple-600 rounded-2xl p-6 lg:p-8 shadow-md text-white mx-4 lg:mx-0">
         <div className="text-center max-w-2xl mx-auto">
           <h2 className="text-xl lg:text-2xl font-bold mb-2">
-           Contact Support
+            Contact Support
           </h2>
-          {/* <p className="text-xs lg:text-sm text-indigo-100 mb-4">
-            Looking for something specific? We can create a tailored package
-            that fits your exact requirements.
-          </p> */}
 
-          {/* Clickable phone that opens dialer / call logs */}
           <p className="text-sm lg:text-base mb-4">
             Call us at{" "}
             <button
@@ -828,7 +830,6 @@ export default function PackagesPage() {
         </div>
       </div>
 
-      {/* Mobile slide in menu */}
       {isMobileMenuOpen && (
         <div className="fixed inset-0 z-50 lg:hidden">
           <div

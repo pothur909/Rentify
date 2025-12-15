@@ -8,6 +8,7 @@ var mongoose = require('mongoose');
 var { startLeadAssignmentWatcher } = require('./services/leadAssignmentWatcher');
 var { startStaleLeadReassignment } = require('./services/staleLeadReassignment');
 var { initializeFirebase } = require('./services/notificationService');
+var { startReminderScheduler } = require('./services/reminderScheduler');
 
 var indexRouter = require('./routes/index');
 var usersRouter = require('./routes/users');
@@ -22,6 +23,7 @@ var s3Router = require('./routes/s3');
 var packagesRouter = require('./routes/packages');
 var subAdminsRouter = require('./routes/subAdmins');
 var notificationsRouter = require('./routes/notifications');
+var remindersRouter = require('./routes/reminders');
 const cors = require('cors');
 
 var app = express();
@@ -89,6 +91,8 @@ mongoose
     startLeadAssignmentWatcher(mongoose.connection);
     // Start scheduled job for stale lead reassignment
     startStaleLeadReassignment();
+    // Start reminder scheduler
+    startReminderScheduler();
   })
   .catch((err) => {
     console.error('MongoDB connection error:', err.message);
@@ -103,6 +107,7 @@ app.use('/api/lead-packages', leadPackageRouter);
 app.use('/api/packages', packagesRouter);
 app.use('/api/sub-admins', subAdminsRouter);
 app.use('/api/notifications', notificationsRouter);
+app.use('/api/reminders', remindersRouter);
 app.use('/api/s3', s3Router);
 
 // catch 404 and forward to error handler

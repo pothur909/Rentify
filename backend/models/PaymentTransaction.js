@@ -47,6 +47,21 @@ const PaymentTransactionSchema = new mongoose.Schema(
       type: Date,
     },
 
+    // Package expiry and usage tracking
+    expiresAt: {
+      type: Date,
+    },
+    leadsAssigned: {
+      type: Number,
+      default: 0,
+    },
+    packageStatus: {
+      type: String,
+      enum: ['paid', 'expired', 'consumed'],
+      default: 'paid',
+      index: true,
+    },
+
     // raw data from Razorpay
     razorpayOrder: {
       type: Object,
@@ -63,6 +78,7 @@ const PaymentTransactionSchema = new mongoose.Schema(
     webhookLastEvent: {
       type: String,
     },
+      autoRenew: { type: Boolean, default: false }, // important
   },
   { timestamps: true }
 );

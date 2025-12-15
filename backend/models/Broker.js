@@ -24,11 +24,16 @@ const BrokerSchema = new mongoose.Schema(
     },
     currentPackage: { type: mongoose.Schema.Types.ObjectId, ref: 'LeadPackage' },
     packagePurchasedAt: { type: Date },
+    packageExpiresAt: { type: Date },
     leadsAssigned: { type: Number, default: 0 },
     fcmTokens: {
       type: [String],
       default: [],
     },
+    currentLeadLimit: {
+  type: Number,
+  default: 0,
+},
   },
   { timestamps: true }
 );
