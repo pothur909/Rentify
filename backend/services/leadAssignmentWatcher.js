@@ -70,6 +70,18 @@ async function assignLeadIfPossible(leadDoc) {
   const assignedTo = selectedBroker._id;
   const assignedAt = new Date();
 
+  // CRITICAL: Re-check package capacity with fresh DB data before assignment
+  // This prevents race conditions where multiple leads might be assigned simultaneously
+  const { checkPackageCapacity } = require('../utils/packageExpiryHelper');
+  const hasCapacity = await checkPackageCapacity(assignedTo, selectedBroker.availablePackage._id);
+  
+  if (!hasCapacity) {
+    console.log(`[assignLeadIfPossible] Package ${selectedBroker.availablePackage._id} has no remaining capacity. Lead ${leadDoc._id} will remain open.`);
+    return; // Don't assign this lead
+  }
+  
+  console.log(`[assignLeadIfPossible] Capacity check passed for broker ${assignedTo}, proceeding with assignment`);
+
   // idempotent update: only assign if still open and unassigned
   const updatedLead = await Lead.findOneAndUpdate(
     { _id: leadDoc._id, status: 'open', $or: [ { assignedTo: null }, { assignedTo: { $exists: false } } ] },
@@ -79,8 +91,26 @@ async function assignLeadIfPossible(leadDoc) {
 
   // If lead was successfully assigned, increment package's leadsAssigned counter
   if (updatedLead) {
-    // Increment the package counter and update status
+    // Increment the package counter and update status (for PaymentTransaction tracking)
     await assignLeadToPackage(selectedBroker.availablePackage._id, updatedLead._id);
+    
+    // Update broker's packageHistory to keep it in sync
+    const { updateBrokerPackageHistory } = require('../utils/packageExpiryHelper');
+    // Pass both transaction ID and package ID to handle all cases
+    // For packageHistory-based packages, the _id IS the packageHistory entry ID
+    const packageRefId = selectedBroker.availablePackage.isFromPackageHistory 
+      ? selectedBroker.availablePackage._id  // Use packageHistory entry ID directly
+      : selectedBroker.availablePackage._id; // Use PaymentTransaction ID
+    
+    const packageId = selectedBroker.availablePackage.packageId?._id || selectedBroker.availablePackage.packageId;
+    
+    console.log(`[assignLeadIfPossible] About to call updateBrokerPackageHistory:`);
+    console.log(`  - brokerId: ${assignedTo}`);
+    console.log(`  - packageRefId: ${packageRefId}`);
+    console.log(`  - packageId: ${packageId}`);
+    console.log(`  - isFromPackageHistory: ${selectedBroker.availablePackage.isFromPackageHistory}`);
+    
+    await updateBrokerPackageHistory(assignedTo, packageRefId, packageId);
     
     // Increment broker's leadsAssigned counter (for backward compatibility)
     await Broker.findByIdAndUpdate(assignedTo, { $inc: { leadsAssigned: 1 } });

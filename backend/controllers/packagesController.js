@@ -195,6 +195,37 @@ exports.assignLeadPackageToBroker = async (req, res, next) => {
     broker.packagePurchasedAt = new Date();
     broker.leadsAssigned = 0; // reset for new purchase
 
+    // Calculate package expiry date from durationLabel
+    const durationMatch = pkg.durationLabel?.match(/(\d+)\s*days?/i);
+    const durationDays = durationMatch ? parseInt(durationMatch[1], 10) : 30;
+    const expiryDate = new Date();
+    expiryDate.setDate(expiryDate.getDate() + durationDays);
+    broker.packageExpiresAt = expiryDate;
+
+    // Add entry to packageHistory for tracking
+    // Skip for subscriptions to avoid duplicates (webhook will create it)
+    const isSubscription = req.body.autoRenew === true || req.body.autoRenew === 'true';
+    
+    if (!isSubscription) {
+      const packageHistoryEntry = {
+        packageId: pkg._id,
+        transactionId: null,
+        packageType: pkg.name || pkg.key,
+        totalLeads: pkg.leadsCount,
+        leadsAssigned: 0,
+        pendingLeads: 0,
+        carriedForwardLeads: 0,
+        startDate: new Date(),
+        endDate: expiryDate,
+        status: 'active',
+        isCarryForward: false,
+        subscriptionType: 'one_time',
+        subscriptionId: null
+      };
+      
+      broker.packageHistory.push(packageHistoryEntry);
+    }
+
     await broker.save();
     await broker.populate('currentPackage');
 
