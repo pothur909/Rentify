@@ -66,6 +66,14 @@ async function manualAssignLead(req, res) {
     // Increment package's leadsAssigned counter and update status if needed
     const updatedPackage = await assignLeadToPackage(availablePackage._id, lead._id);
 
+    // Update broker's packageHistory to keep it in sync
+    const { updateBrokerPackageHistory } = require('../utils/packageExpiryHelper');
+    const packageRefId = availablePackage.isFromPackageHistory 
+      ? availablePackage._id  // Use packageHistory entry ID directly
+      : availablePackage._id; // Use PaymentTransaction ID
+    const packageId = availablePackage.packageId?._id || availablePackage.packageId;
+    await updateBrokerPackageHistory(brokerId, packageRefId, packageId);
+
     // Increment broker's leadsAssigned counter (for backward compatibility)
     await Broker.findByIdAndUpdate(brokerId, {
       $inc: { leadsAssigned: 1 }

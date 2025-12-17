@@ -9,6 +9,7 @@ var { startLeadAssignmentWatcher } = require('./services/leadAssignmentWatcher')
 var { startStaleLeadReassignment } = require('./services/staleLeadReassignment');
 var { initializeFirebase } = require('./services/notificationService');
 var { startReminderScheduler } = require('./services/reminderScheduler');
+var { startPackageRenewalScheduler } = require('./services/packageRenewalScheduler');
 
 var indexRouter = require('./routes/index');
 var usersRouter = require('./routes/users');
@@ -93,6 +94,8 @@ mongoose
     startStaleLeadReassignment();
     // Start reminder scheduler
     startReminderScheduler();
+    // Start package renewal scheduler (monthly)
+    startPackageRenewalScheduler();
   })
   .catch((err) => {
     console.error('MongoDB connection error:', err.message);

@@ -18,10 +18,12 @@ function parseDuration(durationLabel) {
 
 /**
  * Get all active packages for a broker, sorted by oldest first (FIFO)
+ * Checks both PaymentTransaction and broker.packageHistory
  * @param {string} brokerId - Broker's MongoDB ObjectId
- * @returns {Promise<Array>} - Array of PaymentTransaction documents with package details
+ * @returns {Promise<Array>} - Array of package objects with unified structure
  */
 async function getActivePackagesForBroker(brokerId) {
+  // First, try to get packages from PaymentTransaction (proper flow)
   const packages = await PaymentTransaction.find({
     brokerId,
     status: 'paid',
@@ -31,11 +33,42 @@ async function getActivePackagesForBroker(brokerId) {
     .sort({ paidAt: 1 }) // oldest first (FIFO)
     .lean();
   
-  return packages;
+  // If we have PaymentTransaction records, use them
+  if (packages.length > 0) {
+    return packages;
+  }
+
+  // Fallback: If no PaymentTransactions, check broker's packageHistory
+  // This handles brokers who got packages via direct assignment
+  const Broker = require('../models/Broker');
+  const broker = await Broker.findById(brokerId).populate('packageHistory.packageId');
+  
+  if (!broker || !broker.packageHistory || broker.packageHistory.length === 0) {
+    return [];
+  }
+
+  // Convert packageHistory entries to PaymentTransaction-like format
+  const packageHistoryAsTransactions = broker.packageHistory
+    .filter(entry => entry.status === 'active' || entry.status === 'expired')
+    .map(entry => ({
+      _id: entry._id,
+      packageId: entry.packageId,
+      leadsAssigned: entry.leadsAssigned || 0,
+      packageStatus: entry.status === 'active' ? 'paid' : 'expired',
+      isFromPackageHistory: true, // Flag to identify source
+      expiresAt: entry.endDate,
+      paidAt: entry.startDate
+    }))
+    .sort((a, b) => new Date(a.paidAt) - new Date(b.paidAt)); // oldest first
+
+  console.log(`[getActivePackagesForBroker] Using packageHistory fallback for broker ${brokerId}: ${packageHistoryAsTransactions.length} packages`);
+  
+  return packageHistoryAsTransactions;
 }
 
 /**
  * Find the first available package with remaining capacity
+ * Prioritizes carry-forward packages first, then regular packages (FIFO)
  * Checks expiry and lead count
  * @param {Array} packages - Array of package transactions
  * @returns {Object|null} - Available package or null
@@ -43,6 +76,20 @@ async function getActivePackagesForBroker(brokerId) {
 function findAvailablePackage(packages) {
   const now = new Date();
   
+  // First pass: look for carry-forward packages with capacity
+  for (const pkg of packages) {
+    if (!pkg.packageId) continue;
+    
+    const leadsAssigned = pkg.leadsAssigned || 0;
+    const leadsCount = pkg.packageId.leadsCount || 0;
+    
+    // Check if this is a carry-forward package with remaining capacity
+    if (pkg.isCarryForward && leadsAssigned < leadsCount) {
+      return pkg;
+    }
+  }
+  
+  // Second pass: look for regular packages with capacity (FIFO)
   for (const pkg of packages) {
     if (!pkg.packageId) continue;
     
@@ -61,15 +108,18 @@ function findAvailablePackage(packages) {
 
 /**
  * Assign a lead to a package and update its status
- * @param {string} packageTransactionId - PaymentTransaction _id
+ * @param {string} packageTransactionId - PaymentTransaction _id (or packageHistory entry _id)
  * @param {string} leadId - Lead _id (for logging/tracking)
- * @returns {Promise<Object>} - Updated package transaction
+ * @returns {Promise<Object|null>} - Updated package transaction or null if packageHistory-based
  */
 async function assignLeadToPackage(packageTransactionId, leadId) {
   const pkg = await PaymentTransaction.findById(packageTransactionId).populate('packageId');
   
   if (!pkg) {
-    throw new Error('Package transaction not found');
+    // This is likely a packageHistory-based package (e.g., subscription)
+    // The packageHistory will be updated separately by updateBrokerPackageHistory
+    console.log(`[assignLeadToPackage] No PaymentTransaction found for ${packageTransactionId} - assuming packageHistory-based package`);
+    return null;
   }
   
   // Increment leads assigned
@@ -88,6 +138,7 @@ async function assignLeadToPackage(packageTransactionId, leadId) {
   }
   
   await pkg.save();
+  console.log(`[assignLeadToPackage] Updated PaymentTransaction ${packageTransactionId}: ${pkg.leadsAssigned}/${leadsCount} leads`);
   return pkg;
 }
 
@@ -113,10 +164,199 @@ async function getTotalRemainingLeads(brokerId) {
   return totalRemaining;
 }
 
+/**
+ * Check if a specific package still has capacity (with fresh DB data)
+ * This is critical to prevent race conditions during lead assignment
+ * @param {string} brokerId - Broker's MongoDB ObjectId
+ * @param {string} packageRefId - Package reference ID (either PaymentTransaction _id or packageHistory entry _id)
+ * @returns {Promise<boolean>} - True if package has capacity, false otherwise
+ */
+async function checkPackageCapacity(brokerId, packageRefId) {
+  const Broker = require('../models/Broker');
+  
+  // Fetch fresh broker data from DB to avoid stale data issues
+  const broker = await Broker.findById(brokerId);
+  if (!broker || !broker.packageHistory || broker.packageHistory.length === 0) {
+    console.log(`[checkPackageCapacity] No broker or packageHistory found for ${brokerId}`);
+    return false;
+  }
+
+  // Find the specific packageHistory entry using the same matching logic
+  let historyEntry = null;
+  
+  // Try to match by packageHistory entry _id (for subscription packages)
+  historyEntry = broker.packageHistory.find(
+    entry => entry._id && entry._id.toString() === packageRefId?.toString()
+  );
+  
+  // If not found, try matching by transactionId (for PaymentTransaction packages)
+  if (!historyEntry) {
+    historyEntry = broker.packageHistory.find(
+      entry => entry.transactionId && entry.transactionId.toString() === packageRefId?.toString()
+    );
+  }
+  
+  if (!historyEntry) {
+    console.log(`[checkPackageCapacity] No matching packageHistory entry found for refId ${packageRefId}`);
+    return false;
+  }
+  
+  // Check if package has remaining capacity
+  const leadsAssigned = historyEntry.leadsAssigned || 0;
+  const totalLeads = historyEntry.totalLeads || 0;
+  const hasCapacity = leadsAssigned < totalLeads;
+  
+  console.log(`[checkPackageCapacity] Package ${packageRefId}: ${leadsAssigned}/${totalLeads} leads, hasCapacity: ${hasCapacity}`);
+  
+  return hasCapacity;
+}
+
 module.exports = {
   parseDuration,
   getActivePackagesForBroker,
   findAvailablePackage,
   assignLeadToPackage,
-  getTotalRemainingLeads
+  getTotalRemainingLeads,
+  checkPackageCapacity
+};
+
+/**
+ * Update broker's packageHistory when a lead is assigned
+ * Keeps packageHistory in sync with PaymentTransaction
+ * @param {string} brokerId - Broker's MongoDB ObjectId
+ * @param {string} packageTransactionId - PaymentTransaction _id (can be null)
+ * @param {string} packageId - LeadPackage _id (optional, for fallback matching)
+ * @returns {Promise<void>}
+ */
+async function updateBrokerPackageHistory(brokerId, packageRefId, packageId = null) {
+  const Broker = require('../models/Broker');
+  
+  console.log(`[packageHistory] Updating for broker ${brokerId}, refId: ${packageRefId}, pkgId: ${packageId}`);
+  
+  const broker = await Broker.findById(brokerId);
+  if (!broker || !broker.packageHistory || broker.packageHistory.length === 0) {
+    console.log(`[packageHistory] No broker or packageHistory found`);
+    return;
+  }
+
+  console.log(` [packageHistory] Found ${broker.packageHistory.length} package entries`);
+
+  // Find the matching packageHistory entry
+  // Strategy: Try multiple matching approaches in order of preference
+  
+  // Convert packageRefId to string for consistent comparison
+  const refIdStr = packageRefId?.toString();
+  
+  // 1. Try to match by packageHistory entry _id directly (for subscription/packageHistory-based packages)
+  let historyEntry = broker.packageHistory.find(
+    entry => entry._id && entry._id.toString() === refIdStr
+  );
+  
+  if (historyEntry) {
+    console.log(`[packageHistory] ✓ Match by entry _id: ${historyEntry._id}`);
+  } else {
+    console.log(`[packageHistory] ✗ Match by entry _id: NOT FOUND`);
+  }
+
+  // 2. Try to match by transactionId (for PaymentTransaction-based packages)
+  if (!historyEntry && packageRefId) {
+    historyEntry = broker.packageHistory.find(
+      entry => entry.transactionId && entry.transactionId.toString() === refIdStr
+    );
+    
+    if (historyEntry) {
+      console.log(`[packageHistory] ✓ Match by transactionId: ${historyEntry.transactionId}`);
+    } else {
+      console.log(`[packageHistory] ✗ Match by transactionId: NOT FOUND`);
+    }
+  }
+
+  // 3. If no match by IDs and we have packageId, match by packageId + active status
+  if (!historyEntry && packageId) {
+    const pkgIdStr = packageId.toString();
+    historyEntry = broker.packageHistory.find(
+      entry => 
+        entry.packageId?.toString() === pkgIdStr &&
+        entry.status === 'active' && 
+        (entry.leadsAssigned || 0) < (entry.totalLeads || 0)
+    );
+    
+    if (historyEntry) {
+      console.log(`[packageHistory] ✓ Match by packageId: ${pkgIdStr}`);
+    } else {
+      console.log(`[packageHistory] ✗ Match by packageId: NOT FOUND`);
+    }
+  }
+
+  // 4. Fallback: Find first active package with capacity (for backward compatibility)
+  // NOTE: This should rarely be used and might indicate a configuration issue
+  if (!historyEntry) {
+    historyEntry = broker.packageHistory.find(
+      entry => entry.status === 'active' && (entry.leadsAssigned || 0) < (entry.totalLeads || 0)
+    );
+    
+    if (historyEntry) {
+      console.log(`[packageHistory] ⚠ Match by active+capacity (fallback): ${historyEntry._id}`);
+    } else {
+      console.log(`[packageHistory] ✗ Match by active+capacity: NOT FOUND`);
+    }
+  }
+
+  if (!historyEntry) {
+    console.log(`[packageHistory] ❌ No available packageHistory entry found for broker ${brokerId}`);
+    return;
+  }
+
+  console.log(`[packageHistory] Selected entry: ${historyEntry.packageType}, current: ${historyEntry.leadsAssigned}/${historyEntry.totalLeads}`);
+
+  // Use atomic update to prevent race conditions
+  // When multiple leads are assigned simultaneously, we need to ensure each increment is atomic
+  const historyEntryId = historyEntry._id;
+  const totalLeads = historyEntry.totalLeads || 0;
+  const isCarryForward = historyEntry.isCarryForward || false;
+  
+  // Build atomic update operations
+  const updateOps = {
+    $inc: {
+      'packageHistory.$.leadsAssigned': 1
+    }
+  };
+  
+  // Calculate pendingLeads based on package type
+  if (!isCarryForward) {
+    // For regular packages: pending = totalLeads - (leadsAssigned + 1)
+    const newPendingLeads = Math.max(0, totalLeads - (historyEntry.leadsAssigned + 1));
+    updateOps.$set = {
+      'packageHistory.$.pendingLeads': newPendingLeads
+    };
+    
+    // Check if package will be consumed after this increment
+    if ((historyEntry.leadsAssigned + 1) >= totalLeads) {
+      updateOps.$set['packageHistory.$.status'] = 'consumed';
+    }
+  } else {
+    // For carry-forward packages: decrement pendingLeads
+    updateOps.$inc['packageHistory.$.pendingLeads'] = -1;
+  }
+  
+  // Perform atomic update
+  await Broker.updateOne(
+    { 
+      _id: brokerId,
+      'packageHistory._id': historyEntryId
+    },
+    updateOps
+  );
+  
+  console.log(`✓ [packageHistory] Atomically updated for broker ${brokerId}: ${historyEntry.packageType} (${historyEntry.leadsAssigned + 1}/${totalLeads})`);
+}
+
+module.exports = {
+  parseDuration,
+  getActivePackagesForBroker,
+  findAvailablePackage,
+  assignLeadToPackage,
+  getTotalRemainingLeads,
+  checkPackageCapacity,
+  updateBrokerPackageHistory
 };

@@ -315,6 +315,7 @@ const PaymentTransaction = require('../models/PaymentTransaction');
 const PaymentSubscription = require('../models/PaymentSubcription');
 const WebhookLog = require('../models/PaymentWebhook');
 const { assignLeadPackageToBroker } = require('./packagesController');
+const { updatePackageHistoryWithPayment } = require('../utils/packageHistoryHelper');
 
 if (!process.env.RAZORPAY_KEY_ID || !process.env.RAZORPAY_KEY_SECRET) {
   console.error('Razorpay env vars missing');
@@ -565,34 +566,102 @@ async function handleSubscriptionEvent(body) {
       return;
     }
 
-    const internalReq = {
-      body: {
-        brokerId: paymentSub.brokerId.toString(),
-        packageId: paymentSub.packageId.toString(),
-      },
-    };
+    // Only assign package if NOT already assigned for this subscription
+    // Query broker to check for existing packageHistory entry
+    const broker = await Broker.findById(paymentSub.brokerId);
+    const existingEntry = broker?.packageHistory?.find(
+      entry => entry.subscriptionId?.toString() === paymentSub._id.toString()
+    );
 
-    const internalRes = {
-      status(code) {
-        this.statusCode = code;
-        return this;
-      },
-      json(payload) {
-        console.log(
-          'assignLeadPackageToBroker from subscription event:',
-          this.statusCode || 200,
-          payload
-        );
-      },
-    };
+    if (existingEntry) {
+      console.log(`Package already assigned for subscription ${paymentSub._id}, skipping duplicate`);
+      return; // Exit early, don't assign again
+    }
 
-    const internalNext = err => {
-      if (err) {
-        console.error('assignLeadPackageToBroker error from subscription:', err);
+    // Get the package details
+    const pkg = await LeadPackage.findById(paymentSub.packageId);
+    if (!pkg) {
+      console.log('Package not found for subscription');
+      return;
+    }
+
+    // Assign package to broker
+    broker.currentPackage = pkg._id;
+    broker.currentLeadLimit = pkg.leadsCount;
+    broker.packagePurchasedAt = new Date();
+    broker.leadsAssigned = 0;
+
+    // Calculate package expiry date
+    const durationMatch = pkg.durationLabel?.match(/(\d+)\s*days?/i);
+    const durationDays = durationMatch ? parseInt(durationMatch[1], 10) : 30;
+    const expiryDate = new Date();
+    expiryDate.setDate(expiryDate.getDate() + durationDays);
+    broker.packageExpiresAt = expiryDate;
+
+    // Create packageHistory entry for subscription (only monthly_subscription, no one_time)
+    const packageHistoryEntry = {
+      packageId: pkg._id,
+      transactionId: null,
+      packageType: pkg.name || pkg.key,
+      totalLeads: pkg.leadsCount,
+      leadsAssigned: 0,
+      pendingLeads: 0,
+      carriedForwardLeads: 0,
+      startDate: new Date(),
+      endDate: expiryDate,
+      status: 'active',
+      isCarryForward: false,
+      subscriptionType: 'monthly_subscription',
+      subscriptionId: paymentSub._id
+    };
+    
+    broker.packageHistory.push(packageHistoryEntry);
+    await broker.save();
+
+    console.log(`✓ Subscription package assigned to broker ${broker._id}: ${pkg.name} (monthly subscription)`);
+
+    // Automatically assign open leads after 30 seconds
+    setTimeout(async () => {
+      try {
+        console.log(`Starting delayed lead assignment for broker ${broker._id} after 30 seconds...`);
+        
+        const Lead = require('../models/Lead');
+        const openLeads = await Lead.find({ 
+          status: 'open',
+          $or: [
+            { assignedTo: null },
+            { assignedTo: { $exists: false } }
+          ]
+        }).lean();
+
+        console.log(`Found ${openLeads.length} open leads to process for broker ${broker._id}`);
+
+        let assignedCount = 0;
+        for (const lead of openLeads) {
+          try {
+            const currentBroker = await Broker.findById(broker._id);
+            if (currentBroker.leadsAssigned >= pkg.leadsCount) {
+              console.log(`Broker ${broker._id} has reached lead capacity`);
+              break;
+            }
+
+            const { assignLeadIfPossible } = require('../services/leadAssignmentWatcher');
+            await assignLeadIfPossible(lead);
+            
+            const updatedLead = await Lead.findById(lead._id);
+            if (updatedLead && updatedLead.assignedTo && updatedLead.assignedTo.toString() === broker._id.toString()) {
+              assignedCount++;
+            }
+          } catch (err) {
+            console.error(`Error assigning lead ${lead._id}:`, err.message);
+          }
+        }
+
+        console.log(`Successfully assigned ${assignedCount} leads to broker ${broker._id} after 30-second delay`);
+      } catch (err) {
+        console.error('Error during delayed lead assignment:', err.message);
       }
-    };
-
-    await assignLeadPackageToBroker(internalReq, internalRes, internalNext);
+    }, 30000);
   }
 }
 
@@ -954,6 +1023,20 @@ exports.handleWebhook = async (req, res) => {
       await tx.save();
 
       if (tx.brokerId && tx.packageId) {
+        // ✅ FIX: Check if package already assigned for this transaction
+        const broker = await Broker.findById(tx.brokerId);
+        const existingEntry = broker?.packageHistory?.find(
+          entry => entry.transactionId?.toString() === tx._id.toString()
+        );
+
+        if (existingEntry) {
+          console.log(`✓ Package already assigned for transaction ${tx._id}, skipping duplicate assignment`);
+          webhookLog.processingMessage = "Payment marked as paid (already assigned)";
+          webhookLog.responseStatusCode = 200;
+          await webhookLog.save();
+          return res.json({ success: true, message: "Payment marked as paid (already assigned)" });
+        }
+
         const internalReq = {
           body: {
             brokerId: tx.brokerId.toString(),
@@ -980,6 +1063,9 @@ exports.handleWebhook = async (req, res) => {
         };
 
         await assignLeadPackageToBroker(internalReq, internalRes, internalNext);
+        
+        // Update packageHistory with transactionId after creation
+        await updatePackageHistoryWithPayment(tx.brokerId.toString(), tx._id.toString(), null);
       }
 
       webhookLog.processingMessage = "Payment marked as paid";
