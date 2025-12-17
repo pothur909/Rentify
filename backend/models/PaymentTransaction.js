@@ -78,10 +78,19 @@ const PaymentTransactionSchema = new mongoose.Schema(
     webhookLastEvent: {
       type: String,
     },
-      autoRenew: { type: Boolean, default: false }, // important
+  autoRenew: { type: Boolean, default: false }, // important
+ mode: { type: String, enum: ["one_time", "subscription"], required: true,   index: true, },
+subscriptionId: { type: String, index:true }, // Razorpay sub id
+invoiceId: { type: String , index:true},      // Razorpay inv id
+paymentId: { type: String , index: true},      // Razorpay pay_xxx
+cycleNumber: { type: Number,  index: true},    // 1,2,3...
+
   },
   { timestamps: true }
 );
+
+PaymentTransactionSchema.index({ paymentId: 1 }, { unique: true, sparse: true });
+PaymentTransactionSchema.index({ invoiceId: 1 }, { unique: true, sparse: true });
 
 PaymentTransactionSchema.index({ brokerId: 1, createdAt: -1 });
 

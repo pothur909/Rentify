@@ -10,6 +10,10 @@ const {
   getAllPayments,
    getBrokerSubscription,
   cancelBrokerSubscription,
+    getBrokerSubscriptionDetails,
+    
+    getBrokerTransactions,
+
 } = require('../controllers/razorPayment.controller');
 
 // create order
@@ -70,5 +74,9 @@ router.get('/payments-list', getAllPayments);
 
 router.get("/my-subscription/:brokerId", getBrokerSubscription);
 router.post("/cancel-subscription", cancelBrokerSubscription);
+
+router.get("/my-subscription-details/:brokerId", getBrokerSubscriptionDetails);
+router.get("/my-transactions/:brokerId", getBrokerTransactions);
+
 
 module.exports = router;

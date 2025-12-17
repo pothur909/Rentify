@@ -76,7 +76,7 @@
 "use client";
 
 import { useRouter, usePathname } from "next/navigation";
-import { LayoutGrid, User, BookOpen, CreditCard, LogOut } from "lucide-react";
+import { LayoutGrid, User, BookOpen, CreditCard, LogOut, HistoryIcon } from "lucide-react";
 import { useAuthContext } from "@/app/context/AuthContext";
 
 export default function Sidebar() {
@@ -88,6 +88,7 @@ export default function Sidebar() {
     { label: "Overview", href: "/dashboard", icon: LayoutGrid },
     { label: "Leads", href: "/dashboard/leads", icon: BookOpen },
     { label: "Packages", href: "/dashboard/packages", icon: CreditCard },
+        { label: "Transactions", href: "/dashboard/transactions", icon: HistoryIcon },
     { label: "Profile", href: "/dashboard/profile", icon: User },
     { label: "Logout", href: "/logout", icon: LogOut, action: logout },
   ];

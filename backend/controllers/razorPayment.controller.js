@@ -447,16 +447,29 @@ exports.createCheckout = async (req, res) => {
         },
       });
 
+      // const tx = await PaymentTransaction.create({
+      //   brokerId: broker._id,
+      //   packageId: pkg._id,
+      //   amount: pkg.price,
+      //   currency: 'INR',
+      //   orderId: order.id,
+      //   status: 'created',
+      //   razorpayOrder: order,
+      //   autoRenew: false,
+      // });
       const tx = await PaymentTransaction.create({
-        brokerId: broker._id,
-        packageId: pkg._id,
-        amount: pkg.price,
-        currency: 'INR',
-        orderId: order.id,
-        status: 'created',
-        razorpayOrder: order,
-        autoRenew: false,
-      });
+  brokerId: broker._id,
+  packageId: pkg._id,
+  amount: pkg.price,
+  currency: "INR",
+  orderId: order.id,
+  status: "created",
+  razorpayOrder: order,
+
+  mode: "one_time",
+  autoRenew: false,
+});
+
 
       return res.json({
         success: true,
@@ -816,6 +829,222 @@ async function handleSubscriptionEvent(body) {
 //   }
 // };
 
+// async function handleInvoiceEvent(body) {
+//   const event = body.event;
+
+//   // We care only about successful recurring payments
+//   if (event !== "invoice.paid") return;
+
+//   const invoice = body.payload?.invoice?.entity;
+//   if (!invoice) {
+//     console.log("No invoice entity in payload");
+//     return;
+//   }
+
+//   // invoice.subscription_id is the key link for recurring
+//   const subscriptionId = invoice.subscription_id;
+//   if (!subscriptionId) {
+//     console.log("invoice.subscription_id missing, not a subscription invoice");
+//     return;
+//   }
+
+//   // Find your internal subscription doc
+//   const paymentSub = await PaymentSubscription.findOne({
+//     razorpaySubscriptionId: subscriptionId,
+//   });
+
+//   if (!paymentSub) {
+//     console.log("PaymentSubscription not found for", subscriptionId);
+//     return;
+//   }
+
+//   // Payment entity (may exist in invoice payload)
+//   const payment = body.payload?.payment?.entity || null;
+
+//   const paymentId = payment?.id || null;
+//   const orderId = payment?.order_id || null;
+//   const invoiceId = invoice.id || null;
+
+//   // ✅ Idempotency: do not store duplicates if Razorpay retries webhook
+//   // Pick ONE unique key. paymentId is best.
+//   if (paymentId) {
+//     const already = await PaymentTransaction.findOne({ paymentId });
+//     if (already) {
+//       console.log("Recurring payment already stored:", paymentId);
+//       return;
+//     }
+//   }
+
+//   // Create a transaction row for this monthly charge
+//   const amountInRupees = (invoice.amount_paid || invoice.amount || 0) / 100;
+
+//   await PaymentTransaction.create({
+//     brokerId: paymentSub.brokerId,
+//     packageId: paymentSub.packageId,
+
+//     // add these fields to schema if not present, otherwise keep as extra keys
+//     paymentId,
+//     orderId,
+//     invoiceId,
+//     subscriptionId,
+
+//     amount: amountInRupees,
+//     currency: invoice.currency || "INR",
+//     status: "paid",
+//     paidAt: new Date(),
+
+//     // optional: store raw for debugging
+//     razorpayEvents: [body],
+//     autoRenew: true,
+//   });
+
+//   // ✅ Your leads logic for each renewal
+//   // Call your assignLeadPackageToBroker here so every cycle top ups leads
+//   const internalReq = {
+//     body: {
+//       brokerId: paymentSub.brokerId.toString(),
+//       packageId: paymentSub.packageId.toString(),
+//     },
+//   };
+
+//   const internalRes = {
+//     status(code) {
+//       this.statusCode = code;
+//       return this;
+//     },
+//     json(payload) {
+//       console.log("assignLeadPackageToBroker from invoice.paid:", this.statusCode || 200, payload);
+//     },
+//   };
+
+//   const internalNext = (err) => {
+//     if (err) console.error("assignLeadPackageToBroker error from invoice.paid:", err);
+//   };
+
+//   await assignLeadPackageToBroker(internalReq, internalRes, internalNext);
+
+//   console.log("Stored recurring transaction + assigned package for invoice:", invoiceId);
+// }
+
+async function handleInvoiceEvent(body) {
+  const event = body?.event;
+
+  // Only store successful recurring payments
+  if (event !== "invoice.paid") return;
+
+  const invoice = body?.payload?.invoice?.entity;
+  if (!invoice) {
+    console.log("No invoice entity in payload");
+    return;
+  }
+
+  // Key link for recurring payments
+  const subscriptionId = invoice.subscription_id;
+  if (!subscriptionId) {
+    console.log("invoice.subscription_id missing, not a subscription invoice");
+    return;
+  }
+
+  // Find your internal subscription doc
+  const paymentSub = await PaymentSubscription.findOne({
+    razorpaySubscriptionId: subscriptionId,
+  });
+
+  if (!paymentSub) {
+    console.log("PaymentSubscription not found for", subscriptionId);
+    return;
+  }
+
+  // Razorpay sends ids inside invoice entity itself
+  const invoiceId = invoice.id || null;
+  const paymentId = invoice.payment_id || body?.payload?.payment?.entity?.id || null;
+  const orderId = invoice.order_id || body?.payload?.payment?.entity?.order_id || null;
+
+  // Idempotency (Razorpay retries webhooks)
+  // Prefer paymentId, else invoiceId
+  if (paymentId) {
+    const already = await PaymentTransaction.findOne({ paymentId });
+    if (already) {
+      console.log("Recurring payment already stored (paymentId):", paymentId);
+      return;
+    }
+  } else if (invoiceId) {
+    const already = await PaymentTransaction.findOne({ invoiceId });
+    if (already) {
+      console.log("Recurring payment already stored (invoiceId):", invoiceId);
+      return;
+    }
+  }
+
+  // Amount from invoice is in paise
+  const amountInRupees = (invoice.amount_paid || invoice.amount || 0) / 100;
+
+  // paid_at is epoch seconds in Razorpay invoice entity
+  const paidAt = invoice.paid_at ? new Date(invoice.paid_at * 1000) : new Date();
+
+  // Optional cycle number (simple, based on counts if present)
+  const cycleNumber =
+    typeof paymentSub.totalCount === "number" && typeof paymentSub.remainingCount === "number"
+      ? paymentSub.totalCount - paymentSub.remainingCount
+      : undefined;
+
+  // ✅ Create a transaction row for this monthly charge
+  await PaymentTransaction.create({
+    brokerId: paymentSub.brokerId,
+    packageId: paymentSub.packageId,
+
+    mode: "subscription",     // ✅ REQUIRED by your schema
+    autoRenew: true,          // ✅ recurring
+    status: "paid",
+    paidAt,
+
+    subscriptionId,
+    invoiceId,
+    paymentId,
+    orderId,
+    cycleNumber,
+
+    amount: amountInRupees,
+    currency: invoice.currency || "INR",
+
+    razorpayEvents: [body],
+    webhookSignatureVerified: true,
+    webhookLastEvent: event,
+  });
+
+  // ✅ Top up leads / reassign package on every renewal
+  const internalReq = {
+    body: {
+      brokerId: paymentSub.brokerId.toString(),
+      packageId: paymentSub.packageId.toString(),
+    },
+  };
+
+  const internalRes = {
+    status(code) {
+      this.statusCode = code;
+      return this;
+    },
+    json(payload) {
+      console.log(
+        "assignLeadPackageToBroker from invoice.paid:",
+        this.statusCode || 200,
+        payload
+      );
+    },
+  };
+
+  const internalNext = (err) => {
+    if (err) console.error("assignLeadPackageToBroker error from invoice.paid:", err);
+  };
+
+  await assignLeadPackageToBroker(internalReq, internalRes, internalNext);
+
+  console.log("Stored recurring transaction + assigned package for invoice:", invoiceId);
+}
+
+
+
 // POST /api/payments/webhook
 exports.handleWebhook = async (req, res) => {
   const rawBuffer = req.rawBuffer;
@@ -906,6 +1135,25 @@ exports.handleWebhook = async (req, res) => {
       return res.status(500).json({ success: false, message: "Subscription event error" });
     }
   }
+
+  // ✅ Invoice events (recurring payment tracking)
+if (event && event.startsWith("invoice.")) {
+  try {
+    await handleInvoiceEvent(body);
+    webhookLog.processingMessage = `Invoice event ${event} processed`;
+    webhookLog.responseStatusCode = 200;
+    await webhookLog.save();
+    return res.json({ success: true, message: "Invoice event processed" });
+  } catch (err) {
+    console.error("handleInvoiceEvent error", err);
+    webhookLog.processingMessage = "Invoice event error";
+    webhookLog.responseStatusCode = 500;
+    webhookLog.error = { message: err.message, stack: err.stack };
+    await webhookLog.save();
+    return res.status(500).json({ success: false, message: "Invoice event error" });
+  }
+}
+
 
   // One-time payment events only
   const successEvents = ["payment.captured", "order.paid"];
@@ -1153,3 +1401,192 @@ exports.cancelBrokerSubscription = async (req, res) => {
     });
   }
 };
+
+
+
+
+
+// GET /api/payments/my-transactions/:brokerId?type=one_time|subscription|all
+exports.getBrokerTransactions = async (req, res) => {
+  try {
+    const { brokerId } = req.params;
+    const type = (req.query.type || "all").toString();
+
+    if (!brokerId) {
+      return res.status(400).json({ success: false, message: "brokerId is required" });
+    }
+
+    const txs = await PaymentTransaction.find({ brokerId })
+      .sort({ createdAt: -1 })
+      .populate("packageId", "name key leadsCount price durationLabel")
+      .lean();
+
+    const normalize = (tx) => {
+      // If you later add fields like subscriptionId/paymentId in schema it will still work
+      const isSubscription =
+        Boolean(tx.subscriptionId) ||
+        Boolean(tx.invoiceId) ||
+        Boolean(tx.autoRenew) ||
+        Boolean(tx.razorpaySubscriptionId);
+
+      const mode = isSubscription ? "subscription" : "one_time";
+
+      return {
+        _id: tx._id,
+        mode,
+        status: tx.status,
+        amount: tx.amount,
+        currency: tx.currency || "INR",
+        orderId: tx.orderId || null,
+        paymentId: tx.paymentId || null,
+        invoiceId: tx.invoiceId || null,
+        subscriptionId: tx.subscriptionId || null,
+        package: tx.packageId
+          ? {
+              _id: tx.packageId._id,
+              name: tx.packageId.name,
+              key: tx.packageId.key,
+              leadsCount: tx.packageId.leadsCount,
+              price: tx.packageId.price,
+              durationLabel: tx.packageId.durationLabel,
+            }
+          : null,
+        createdAt: tx.createdAt,
+        paidAt: tx.paidAt || null,
+      };
+    };
+
+    const mapped = txs.map(normalize);
+
+    let filtered = mapped;
+    if (type === "one_time") filtered = mapped.filter((t) => t.mode === "one_time");
+    if (type === "subscription") filtered = mapped.filter((t) => t.mode === "subscription");
+
+    return res.json({
+      success: true,
+      data: filtered,
+    });
+  } catch (err) {
+    console.error("getBrokerTransactions error", err);
+    return res.status(500).json({
+      success: false,
+      message: "Failed to fetch transactions",
+      error: err.message,
+    });
+  }
+};
+
+
+// GET /api/payments/my-subscription-details/:brokerId
+// exports.getBrokerSubscriptionDetails = async (req, res) => {
+//   try {
+//     const { brokerId } = req.params;
+
+//     if (!brokerId) {
+//       return res.status(400).json({ success: false, message: "brokerId is required" });
+//     }
+
+//     const sub = await PaymentSubscription.findOne({ brokerId })
+//       .sort({ createdAt: -1 })
+//       .populate("packageId", "name key leadsCount price durationLabel")
+//       .lean();
+
+//     if (!sub) {
+//       return res.json({ success: true, data: null });
+//     }
+
+//     // Next cycle: use currentCycleEnd if available, else null
+//     const nextCycleOn = sub.currentCycleEnd ? sub.currentCycleEnd : null;
+
+//     return res.json({
+//       success: true,
+//       data: {
+//         _id: sub._id,
+//         razorpaySubscriptionId: sub.razorpaySubscriptionId,
+//         status: sub.status,
+//         totalCount: sub.totalCount ?? null,
+//         remainingCount: sub.remainingCount ?? null,
+//         subscriptionCreatedAt: sub.createdAt,
+//         currentCycleStart: sub.currentCycleStart || null,
+//         currentCycleEnd: sub.currentCycleEnd || null,
+//         nextCycleOn,
+//         package: sub.packageId
+//           ? {
+//               _id: sub.packageId._id,
+//               name: sub.packageId.name,
+//               key: sub.packageId.key,
+//               leadsCount: sub.packageId.leadsCount,
+//               price: sub.packageId.price,
+//               durationLabel: sub.packageId.durationLabel,
+//             }
+//           : null,
+//       },
+//     });
+//   } catch (err) {
+//     console.error("getBrokerSubscriptionDetails error", err);
+//     return res.status(500).json({
+//       success: false,
+//       message: "Failed to fetch subscription details",
+//       error: err.message,
+//     });
+//   }
+// };
+
+exports.getBrokerSubscriptionDetails = async (req, res) => {
+  try {
+    const { brokerId } = req.params;
+
+    if (!brokerId) {
+      return res.status(400).json({ success: false, message: "brokerId is required" });
+    }
+
+    const sub = await PaymentSubscription.findOne({ brokerId })
+      .sort({ createdAt: -1 })
+      .populate("packageId", "name key leadsCount price durationLabel")
+      .lean();
+
+    if (!sub) {
+      return res.json({ success: true, data: null });
+    }
+
+    const nextCycleOn = sub.currentCycleEnd ? sub.currentCycleEnd : null;
+
+    // ✅ only this should count as "Active"
+    const effectiveActive = sub.status === "active";
+
+    return res.json({
+      success: true,
+      data: {
+        _id: sub._id,
+        razorpaySubscriptionId: sub.razorpaySubscriptionId,
+        status: sub.status,
+        effectiveActive,
+        totalCount: sub.totalCount ?? null,
+        remainingCount: sub.remainingCount ?? null,
+        subscriptionCreatedAt: sub.createdAt,
+        currentCycleStart: sub.currentCycleStart || null,
+        currentCycleEnd: sub.currentCycleEnd || null,
+        nextCycleOn,
+        package: sub.packageId
+          ? {
+              _id: sub.packageId._id,
+              name: sub.packageId.name,
+              key: sub.packageId.key,
+              leadsCount: sub.packageId.leadsCount,
+              price: sub.packageId.price,
+              durationLabel: sub.packageId.durationLabel,
+            }
+          : null,
+      },
+    });
+  } catch (err) {
+    console.error("getBrokerSubscriptionDetails error", err);
+    return res.status(500).json({
+      success: false,
+      message: "Failed to fetch subscription details",
+      error: err.message,
+    });
+  }
+};
+
+

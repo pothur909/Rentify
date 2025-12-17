@@ -34,6 +34,17 @@ const BrokerSchema = new mongoose.Schema(
   type: Number,
   default: 0,
 },
+packageType: {
+  type: String,
+  enum: ["none", "one_time", "subscription"],
+  default: "none",
+},
+activeSubscriptionId: {
+  type: mongoose.Schema.Types.ObjectId,
+  ref: "PaymentSubscription",
+  default: null,
+},
+
   },
   { timestamps: true }
 );

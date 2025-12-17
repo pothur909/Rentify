@@ -19,11 +19,10 @@
 //   LogOut,
 // } from "lucide-react";
 // import { useEffect, useState } from "react";
-// import RazorpayPackageButton from "../../components/RazorpayPackageButton";
+// import PurchaseLeadPackage from "../../components/PurchaseLeadPackage";
 // import { useAuthContext } from "../../context/AuthContext";
 // import { useRouter, usePathname } from "next/navigation";
 
-// // match your backend model
 // type LeadPackageApi = {
 //   _id: string;
 //   key: string;
@@ -40,6 +39,8 @@
 //   popular: boolean;
 //   sortOrder: number;
 //   isActive: boolean;
+
+//   supportsSubscription?: boolean;
 // };
 
 // type LeadPackageUI = {
@@ -55,9 +56,9 @@
 //   iconBg: string;
 //   features: string[];
 //   popular: boolean;
+//   supportsSubscription: boolean;
 // };
 
-// // map iconKey from backend to actual icon component
 // const iconMap: Record<string, typeof Package> = {
 //   package: Package,
 //   zap: Zap,
@@ -121,6 +122,7 @@
 //               iconBg: p.iconBgClass || "bg-gray-700",
 //               features: p.features || [],
 //               popular: !!p.popular,
+//               supportsSubscription: p.supportsSubscription !== false,
 //             };
 //           });
 
@@ -169,13 +171,11 @@
 //   ];
 
 //   const handleCallSales = () => {
-//     // opens dialer / call logs on mobile
 //     window.location.href = "tel:+919322645845";
 //   };
 
 //   return (
 //     <div className="text-gray-800 w-full max-w-full overflow-x-hidden">
-//       {/* Mobile header */}
 //       <div className="lg:hidden sticky top-0 z-40 bg-white border-b border-gray-200 mb-4">
 //         <div className="flex items-center justify-between px-4 py-3">
 //           <div>
@@ -195,7 +195,6 @@
 //         </div>
 //       </div>
 
-//       {/* Desktop header */}
 //       <div className="mb-8 hidden lg:block">
 //         <h1 className="text-3xl font-bold text-gray-900 mb-2">
 //           Lead Packages
@@ -205,7 +204,6 @@
 //         </p>
 //       </div>
 
-//       {/* Mobile heading under header */}
 //       <div className="mb-4 lg:hidden px-4">
 //         <h1 className="text-2xl font-bold text-gray-900 mb-1">
 //           Lead Packages
@@ -215,31 +213,8 @@
 //         </p>
 //       </div>
 
-//       {/* Stats Overview */}
-//       <div className="grid grid-cols-1 md:grid-cols-3 gap-4 lg:gap-6 mb-8 px-4 lg:px-0">
-//         {stats.map((stat) => (
-//           <div
-//             key={stat.label}
-//             className="bg-white rounded-2xl p-4 lg:p-6 shadow-md border border-gray-100 hover:shadow-xl transition-all duration-300"
-//           >
-//             <div className="flex items-center gap-4">
-//               <div className={`p-3 lg:p-4 rounded-xl ${stat.bg}`}>
-//                 <stat.icon className={`w-5 h-5 lg:w-6 lg:h-6 ${stat.color}`} />
-//               </div>
-//               <div>
-//                 <p className="text-gray-600 text-xs lg:text-sm font-medium">
-//                   {stat.label}
-//                 </p>
-//                 <p className="text-2xl lg:text-3xl font-bold text-gray-900">
-//                   {stat.value}
-//                 </p>
-//               </div>
-//             </div>
-//           </div>
-//         ))}
-//       </div>
 
-//       {/* Loading / Error states */}
+
 //       {loading && (
 //         <div className="py-10 text-center text-gray-500 px-4 lg:px-0">
 //           Loading packages...
@@ -252,7 +227,6 @@
 //         </div>
 //       )}
 
-//       {/* Packages Grid */}
 //       {!loading && !error && (
 //         <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-5 lg:gap-6 px-4 lg:px-0">
 //           {packages.map((pkg) => (
@@ -265,7 +239,6 @@
 //               }`}
 //               style={{ backgroundColor: "white" }}
 //             >
-//               {/* Popular Badge */}
 //               {pkg.popular && (
 //                 <div className="absolute -top-3 left-1/2 transform -translate-x-1/2">
 //                   <span className="bg-gradient-to-r from-purple-500 to-purple-600 text-white text-xs font-bold px-4 py-1 rounded-full shadow-lg flex items-center gap-1">
@@ -275,7 +248,6 @@
 //                 </div>
 //               )}
 
-//               {/* Package Icon */}
 //               <div
 //                 className={`${pkg.bg} w-16 h-16 rounded-xl flex items-center justify-center mb-4 mx-auto`}
 //               >
@@ -284,12 +256,10 @@
 //                 </div>
 //               </div>
 
-//               {/* Package Name */}
 //               <h3 className="text-lg lg:text-xl font-bold text-gray-900 text-center mb-2">
 //                 {pkg.name}
 //               </h3>
 
-//               {/* Price */}
 //               <div className="text-center mb-4">
 //                 <p
 //                   className={`text-3xl lg:text-4xl font-bold bg-gradient-to-r ${pkg.gradient} bg-clip-text text-transparent`}
@@ -302,7 +272,6 @@
 //                 </p>
 //               </div>
 
-//               {/* Leads Count Badge */}
 //               <div className="bg-gradient-to-r from-gray-50 to-gray-100 rounded-xl p-3 lg:p-4 mb-4 text-center border border-gray-200">
 //                 <div className="flex items-center justify-center gap-2 mb-1">
 //                   <Users className="w-4 h-4 lg:w-5 lg:h-5 text-gray-600" />
@@ -315,7 +284,6 @@
 //                 </p>
 //               </div>
 
-//               {/* Features List */}
 //               <ul className="space-y-2.5 lg:space-y-3 mb-5 lg:mb-6">
 //                 {pkg.features.map((feature, index) => (
 //                   <li
@@ -328,13 +296,14 @@
 //                 ))}
 //               </ul>
 
-//               {/* CTA Button -> Razorpay */}
 //               {isAuthenticated && broker ? (
-//                 <RazorpayPackageButton
+//                 <PurchaseLeadPackage
 //                   brokerId={broker._id}
+//                   packageId={pkg.id}
 //                   packageKey={pkg.key}
 //                   packageName={pkg.name}
 //                   amount={pkg.price}
+//                   supportsSubscription={pkg.supportsSubscription}
 //                 />
 //               ) : (
 //                 <button
@@ -352,18 +321,12 @@
 //         </div>
 //       )}
 
-//       {/* Contact Section */}
 //       <div className="mt-8 bg-gradient-to-br from-indigo-500 to-purple-600 rounded-2xl p-6 lg:p-8 shadow-md text-white mx-4 lg:mx-0">
 //         <div className="text-center max-w-2xl mx-auto">
 //           <h2 className="text-xl lg:text-2xl font-bold mb-2">
-//            Contact Support
+//             Contact Support
 //           </h2>
-//           {/* <p className="text-xs lg:text-sm text-indigo-100 mb-4">
-//             Looking for something specific? We can create a tailored package
-//             that fits your exact requirements.
-//           </p> */}
 
-//           {/* Clickable phone that opens dialer / call logs */}
 //           <p className="text-sm lg:text-base mb-4">
 //             Call us at{" "}
 //             <button
@@ -385,7 +348,6 @@
 //         </div>
 //       </div>
 
-//       {/* Mobile slide in menu */}
 //       {isMobileMenuOpen && (
 //         <div className="fixed inset-0 z-50 lg:hidden">
 //           <div
@@ -460,6 +422,7 @@
 //   );
 // }
 
+
 "use client";
 
 import {
@@ -479,8 +442,9 @@ import {
   CreditCard,
   LogOut,
 } from "lucide-react";
-import { useEffect, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import PurchaseLeadPackage from "../../components/PurchaseLeadPackage";
+import StatusPopup from "../../components/StatusPopup";
 import { useAuthContext } from "../../context/AuthContext";
 import { useRouter, usePathname } from "next/navigation";
 
@@ -500,7 +464,6 @@ type LeadPackageApi = {
   popular: boolean;
   sortOrder: number;
   isActive: boolean;
-
   supportsSubscription?: boolean;
 };
 
@@ -520,6 +483,11 @@ type LeadPackageUI = {
   supportsSubscription: boolean;
 };
 
+type SubDetails = {
+  status: string;
+  package?: { _id: string; name: string; key: string };
+};
+
 const iconMap: Record<string, typeof Package> = {
   package: Package,
   zap: Zap,
@@ -537,8 +505,22 @@ export default function PackagesPage() {
   const [error, setError] = useState<string | null>(null);
   const [isMobileMenuOpen, setIsMobileMenuOpen] = useState(false);
 
-  const API_BASE =
-    process.env.NEXT_PUBLIC_BASE_URL || "http://localhost:7000";
+  // ✅ popup state
+  const [popupOpen, setPopupOpen] = useState(false);
+  const [popupVariant, setPopupVariant] = useState<"success" | "pending" | "error">("pending");
+  const [popupTitle, setPopupTitle] = useState("");
+  const [popupMessage, setPopupMessage] = useState("");
+
+  const API_BASE = process.env.NEXT_PUBLIC_BASE_URL || "http://localhost:7000";
+
+  const openPopup = (variant: "success" | "pending" | "error", title: string, message: string) => {
+    setPopupVariant(variant);
+    setPopupTitle(title);
+    setPopupMessage(message);
+    setPopupOpen(true);
+  };
+
+  const closePopup = () => setPopupOpen(false);
 
   useEffect(() => {
     const fetchPackages = async () => {
@@ -546,30 +528,17 @@ export default function PackagesPage() {
         setLoading(true);
         setError(null);
 
-        const res = await fetch(`${API_BASE}/api/lead-packages`, {
-          credentials: "include",
-        });
-
-        if (!res.ok) {
-          throw new Error(`Failed to fetch packages: ${res.status}`);
-        }
+        const res = await fetch(`${API_BASE}/api/lead-packages`, { credentials: "include" });
+        if (!res.ok) throw new Error(`Failed to fetch packages: ${res.status}`);
 
         const json = await res.json();
-
-        if (!json.success || !Array.isArray(json.data)) {
-          throw new Error("Unexpected response shape from /api/lead-packages");
-        }
+        if (!json.success || !Array.isArray(json.data)) throw new Error("Unexpected response shape");
 
         const mapped: LeadPackageUI[] = json.data
           .filter((p: LeadPackageApi) => p.isActive)
-          .sort(
-            (a: LeadPackageApi, b: LeadPackageApi) =>
-              (a.sortOrder ?? 0) - (b.sortOrder ?? 0)
-          )
+          .sort((a: LeadPackageApi, b: LeadPackageApi) => (a.sortOrder ?? 0) - (b.sortOrder ?? 0))
           .map((p: LeadPackageApi) => {
-            const IconComp =
-              iconMap[p.iconKey] || iconMap[p.key] || Package;
-
+            const IconComp = iconMap[p.iconKey] || iconMap[p.key] || Package;
             return {
               id: p._id,
               key: p.key,
@@ -599,51 +568,84 @@ export default function PackagesPage() {
     fetchPackages();
   }, [API_BASE]);
 
-  const stats = [
-    {
-      label: "Active Packages",
-      value: packages.length.toString(),
-      icon: Package,
-      color: "text-blue-600",
-      bg: "bg-blue-100",
-    },
-    {
-      label: "Total Leads Purchased",
-      value: "90",
-      icon: Users,
-      color: "text-purple-600",
-      bg: "bg-purple-100",
-    },
-    {
-      label: "Leads Remaining",
-      value: "45",
-      icon: TrendingUp,
-      color: "text-green-600",
-      bg: "bg-green-100",
-    },
-  ];
-
-  const mobileMenu = [
-    { label: "Overview", href: "/dashboard", icon: LayoutGrid },
-    { label: "Leads", href: "/dashboard/leads", icon: BookOpen },
-    { label: "Packages", href: "/dashboard/packages", icon: CreditCard },
-    { label: "Profile", href: "/dashboard/profile", icon: UserIcon },
-    { label: "Logout", href: "/logout", icon: LogOut, action: logout },
-  ];
+  const mobileMenu = useMemo(
+    () => [
+      { label: "Overview", href: "/dashboard", icon: LayoutGrid },
+      { label: "Leads", href: "/dashboard/leads", icon: BookOpen },
+      { label: "Packages", href: "/dashboard/packages", icon: CreditCard },
+      { label: "Profile", href: "/dashboard/profile", icon: UserIcon },
+      { label: "Logout", href: "/logout", icon: LogOut, action: logout },
+    ],
+    [logout]
+  );
 
   const handleCallSales = () => {
     window.location.href = "tel:+919322645845";
   };
 
+  // ✅ Poll until subscription becomes active
+  const pollUntilActive = async (brokerId: string, packageId: string, packageName: string) => {
+    const maxTries = 20; // ~40s
+    const delayMs = 2000;
+
+    for (let i = 0; i < maxTries; i++) {
+      try {
+        const res = await fetch(`${API_BASE}/api/payments/my-subscription-details/${brokerId}`, {
+          credentials: "include",
+        });
+        const json = await res.json();
+
+        const data: SubDetails | null = json?.data || null;
+        const status = String(data?.status || "");
+        const subPkgId = String(data?.package?._id || "");
+
+        if (subPkgId === String(packageId) && status === "active") {
+          openPopup("success", "Subscription active", `${packageName} is active now. You can start receiving leads.`);
+          setTimeout(() => closePopup(), 2000);
+          return;
+        }
+
+        // still pending, keep waiting
+      } catch {
+        // ignore
+      }
+
+      await new Promise((r) => setTimeout(r, delayMs));
+    }
+
+    openPopup("error", "Still confirming", "Payment is received, but activation is still pending. Refresh after some time.");
+  };
+
+  // ✅ This is triggered by PurchaseLeadPackage after Razorpay handler success
+  const handlePaymentSuccess = async (payload: { packageId: string; packageName: string; mode: "one_time" | "subscription" }) => {
+    if (!broker?._id) return;
+
+    if (payload.mode === "subscription") {
+      openPopup("pending", "Payment received", "Waiting for webhook confirmation and activation...");
+      await pollUntilActive(broker._id, payload.packageId, payload.packageName);
+      return;
+    }
+
+    // One-time: you can poll your transaction endpoint if you want.
+    openPopup("success", "Payment received", "Payment successful. Package will be active shortly.");
+    setTimeout(() => closePopup(), 2000);
+  };
+
   return (
     <div className="text-gray-800 w-full max-w-full overflow-x-hidden">
+      <StatusPopup
+        open={popupOpen}
+        variant={popupVariant}
+        title={popupTitle}
+        message={popupMessage}
+        onClose={closePopup}
+      />
+
       <div className="lg:hidden sticky top-0 z-40 bg-white border-b border-gray-200 mb-4">
         <div className="flex items-center justify-between px-4 py-3">
           <div>
             <p className="text-xs text-gray-500">Hello</p>
-            <p className="text-base font-semibold text-gray-900">
-              {broker?.name || "Broker"}
-            </p>
+            <p className="text-base font-semibold text-gray-900">{broker?.name || "Broker"}</p>
             <p className="text-xs text-gray-500">Lead packages</p>
           </div>
           <button
@@ -657,51 +659,16 @@ export default function PackagesPage() {
       </div>
 
       <div className="mb-8 hidden lg:block">
-        <h1 className="text-3xl font-bold text-gray-900 mb-2">
-          Lead Packages
-        </h1>
-        <p className="text-gray-600">
-          Choose the perfect package to grow your real estate business.
-        </p>
+        <h1 className="text-3xl font-bold text-gray-900 mb-2">Lead Packages</h1>
+        <p className="text-gray-600">Choose the perfect package to grow your real estate business.</p>
       </div>
 
       <div className="mb-4 lg:hidden px-4">
-        <h1 className="text-2xl font-bold text-gray-900 mb-1">
-          Lead Packages
-        </h1>
-        <p className="text-sm text-gray-600">
-          Choose a package and start getting leads.
-        </p>
+        <h1 className="text-2xl font-bold text-gray-900 mb-1">Lead Packages</h1>
+        <p className="text-sm text-gray-600">Choose a package and start getting leads.</p>
       </div>
 
-      <div className="grid grid-cols-1 md:grid-cols-3 gap-4 lg:gap-6 mb-8 px-4 lg:px-0">
-        {stats.map((stat) => (
-          <div
-            key={stat.label}
-            className="bg-white rounded-2xl p-4 lg:p-6 shadow-md border border-gray-100 hover:shadow-xl transition-all duration-300"
-          >
-            <div className="flex items-center gap-4">
-              <div className={`p-3 lg:p-4 rounded-xl ${stat.bg}`}>
-                <stat.icon className={`w-5 h-5 lg:w-6 lg:h-6 ${stat.color}`} />
-              </div>
-              <div>
-                <p className="text-gray-600 text-xs lg:text-sm font-medium">
-                  {stat.label}
-                </p>
-                <p className="text-2xl lg:text-3xl font-bold text-gray-900">
-                  {stat.value}
-                </p>
-              </div>
-            </div>
-          </div>
-        ))}
-      </div>
-
-      {loading && (
-        <div className="py-10 text-center text-gray-500 px-4 lg:px-0">
-          Loading packages...
-        </div>
-      )}
+      {loading && <div className="py-10 text-center text-gray-500 px-4 lg:px-0">Loading packages...</div>}
 
       {error && !loading && (
         <div className="py-4 mb-6 rounded-lg bg-red-50 text-red-700 text-sm text-center border border-red-200 px-4 lg:px-0">
@@ -715,9 +682,7 @@ export default function PackagesPage() {
             <div
               key={pkg.id}
               className={`relative rounded-2xl p-5 lg:p-6 shadow-md hover:shadow-xl transition-all duration-300 transform hover:-translate-y-2 border ${
-                pkg.popular
-                  ? "border-purple-300 ring-2 ring-purple-200"
-                  : "border-gray-100"
+                pkg.popular ? "border-purple-300 ring-2 ring-purple-200" : "border-gray-100"
               }`}
               style={{ backgroundColor: "white" }}
             >
@@ -730,22 +695,16 @@ export default function PackagesPage() {
                 </div>
               )}
 
-              <div
-                className={`${pkg.bg} w-16 h-16 rounded-xl flex items-center justify-center mb-4 mx-auto`}
-              >
+              <div className={`${pkg.bg} w-16 h-16 rounded-xl flex items-center justify-center mb-4 mx-auto`}>
                 <div className={`p-3 rounded-lg ${pkg.iconBg} shadow-lg`}>
                   <pkg.icon className="w-6 h-6 text-white" />
                 </div>
               </div>
 
-              <h3 className="text-lg lg:text-xl font-bold text-gray-900 text-center mb-2">
-                {pkg.name}
-              </h3>
+              <h3 className="text-lg lg:text-xl font-bold text-gray-900 text-center mb-2">{pkg.name}</h3>
 
               <div className="text-center mb-4">
-                <p
-                  className={`text-3xl lg:text-4xl font-bold bg-gradient-to-r ${pkg.gradient} bg-clip-text text-transparent`}
-                >
+                <p className={`text-3xl lg:text-4xl font-bold bg-gradient-to-r ${pkg.gradient} bg-clip-text text-transparent`}>
                   ₹{pkg.price.toLocaleString("en-IN")}
                 </p>
                 <p className="text-xs lg:text-sm text-gray-500 mt-1 flex items-center justify-center gap-1">
@@ -757,21 +716,14 @@ export default function PackagesPage() {
               <div className="bg-gradient-to-r from-gray-50 to-gray-100 rounded-xl p-3 lg:p-4 mb-4 text-center border border-gray-200">
                 <div className="flex items-center justify-center gap-2 mb-1">
                   <Users className="w-4 h-4 lg:w-5 lg:h-5 text-gray-600" />
-                  <span className="text-xl lg:text-2xl font-bold text-gray-900">
-                    {pkg.leads}
-                  </span>
+                  <span className="text-xl lg:text-2xl font-bold text-gray-900">{pkg.leads}</span>
                 </div>
-                <p className="text-xs text-gray-600 font-medium">
-                  Verified Leads
-                </p>
+                <p className="text-xs text-gray-600 font-medium">Verified Leads</p>
               </div>
 
               <ul className="space-y-2.5 lg:space-y-3 mb-5 lg:mb-6">
                 {pkg.features.map((feature, index) => (
-                  <li
-                    key={index}
-                    className="flex items-start gap-2 text-xs lg:text-sm text-gray-700"
-                  >
+                  <li key={index} className="flex items-start gap-2 text-xs lg:text-sm text-gray-700">
                     <CheckCircle className="w-4 h-4 lg:w-5 lg:h-5 text-green-500 flex-shrink-0 mt-0.5" />
                     <span>{feature}</span>
                   </li>
@@ -786,14 +738,13 @@ export default function PackagesPage() {
                   packageName={pkg.name}
                   amount={pkg.price}
                   supportsSubscription={pkg.supportsSubscription}
+                  onPaymentSuccess={handlePaymentSuccess}
                 />
               ) : (
                 <button
                   type="button"
                   className="w-full bg-gray-200 text-gray-700 font-semibold py-2.5 px-4 rounded-lg text-sm"
-                  onClick={() => {
-                    alert("Please log in as broker to purchase a package.");
-                  }}
+                  onClick={() => router.push("/login")}
                 >
                   Login to purchase
                 </button>
@@ -805,17 +756,11 @@ export default function PackagesPage() {
 
       <div className="mt-8 bg-gradient-to-br from-indigo-500 to-purple-600 rounded-2xl p-6 lg:p-8 shadow-md text-white mx-4 lg:mx-0">
         <div className="text-center max-w-2xl mx-auto">
-          <h2 className="text-xl lg:text-2xl font-bold mb-2">
-            Contact Support
-          </h2>
+          <h2 className="text-xl lg:text-2xl font-bold mb-2">Contact Support</h2>
 
           <p className="text-sm lg:text-base mb-4">
             Call us at{" "}
-            <button
-              type="button"
-              onClick={handleCallSales}
-              className="underline font-semibold"
-            >
+            <button type="button" onClick={handleCallSales} className="underline font-semibold">
               +91 93226 45845
             </button>
           </p>
@@ -832,25 +777,15 @@ export default function PackagesPage() {
 
       {isMobileMenuOpen && (
         <div className="fixed inset-0 z-50 lg:hidden">
-          <div
-            className="absolute inset-0 bg-black/40"
-            onClick={() => setIsMobileMenuOpen(false)}
-          />
+          <div className="absolute inset-0 bg-black/40" onClick={() => setIsMobileMenuOpen(false)} />
           <div className="absolute top-0 right-0 h-full w-72 bg-gradient-to-b from-blue-600 to-indigo-700 text-white shadow-2xl p-5 flex flex-col">
             <div className="flex items-center justify-between mb-4">
               <div>
                 <p className="text-xs text-blue-100">Broker</p>
-                <p className="text-base font-semibold">
-                  {broker?.name || "Broker"}
-                </p>
-                <p className="text-xs text-blue-100">
-                  {broker?.phoneNumber}
-                </p>
+                <p className="text-base font-semibold">{broker?.name || "Broker"}</p>
+                <p className="text-xs text-blue-100">{broker?.phoneNumber}</p>
               </div>
-              <button
-                onClick={() => setIsMobileMenuOpen(false)}
-                className="p-2 rounded-full hover:bg-white/10"
-              >
+              <button onClick={() => setIsMobileMenuOpen(false)} className="p-2 rounded-full hover:bg-white/10">
                 <X className="w-5 h-5 text-white" />
               </button>
             </div>
@@ -864,10 +799,7 @@ export default function PackagesPage() {
 
                 const handleClick = () => {
                   setIsMobileMenuOpen(false);
-                  if (item.action) {
-                    item.action();
-                    return;
-                  }
+                  if (item.action) return item.action();
                   router.push(item.href);
                 };
 
@@ -883,11 +815,7 @@ export default function PackagesPage() {
                         : "text-white/90 hover:bg-white/10"
                     }`}
                   >
-                    <item.icon
-                      className={`w-5 h-5 ${
-                        isActive ? "text-blue-700" : "text-white"
-                      }`}
-                    />
+                    <item.icon className={`w-5 h-5 ${isActive ? "text-blue-700" : "text-white"}`} />
                     <span>{item.label}</span>
                   </button>
                 );
