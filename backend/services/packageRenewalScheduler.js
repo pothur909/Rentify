@@ -87,6 +87,10 @@ async function processIndividualBrokerRenewal(broker, now) {
   }
 
   await broker.save();
+  
+  // Recalculate broker totals after renewal processing
+  const { recalculateBrokerTotals } = require('./leadAssignmentWatcher');
+  await recalculateBrokerTotals(broker._id);
 }
 
 /**

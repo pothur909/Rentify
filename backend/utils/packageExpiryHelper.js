@@ -54,8 +54,10 @@ async function getActivePackagesForBroker(brokerId) {
       _id: entry._id,
       packageId: entry.packageId,
       leadsAssigned: entry.leadsAssigned || 0,
+      totalLeads: entry.totalLeads || 0, // Include totalLeads for capacity checks
       packageStatus: entry.status === 'active' ? 'paid' : 'expired',
       isFromPackageHistory: true, // Flag to identify source
+      isCarryForward: entry.isCarryForward || false, // Include carry-forward flag
       expiresAt: entry.endDate,
       paidAt: entry.startDate
     }))
@@ -76,15 +78,24 @@ async function getActivePackagesForBroker(brokerId) {
 function findAvailablePackage(packages) {
   const now = new Date();
   
+  console.log(`[findAvailablePackage] Evaluating ${packages.length} packages`);
+  
   // First pass: look for carry-forward packages with capacity
   for (const pkg of packages) {
-    if (!pkg.packageId) continue;
+    if (!pkg.packageId) {
+      console.log(`[findAvailablePackage] Skipping package - no packageId`);
+      continue;
+    }
     
     const leadsAssigned = pkg.leadsAssigned || 0;
-    const leadsCount = pkg.packageId.leadsCount || 0;
+    // For packageHistory-based packages, use totalLeads; for PaymentTransaction, use packageId.leadsCount
+    const leadsCount = pkg.totalLeads || pkg.packageId.leadsCount || pkg.packageId?.leadsCount || 0;
+    
+    console.log(`[findAvailablePackage] Package ${pkg._id}: isCarryForward=${pkg.isCarryForward}, leadsAssigned=${leadsAssigned}, leadsCount=${leadsCount}, isFromPackageHistory=${pkg.isFromPackageHistory}`);
     
     // Check if this is a carry-forward package with remaining capacity
     if (pkg.isCarryForward && leadsAssigned < leadsCount) {
+      console.log(`[findAvailablePackage] ✓ Selected carry-forward package ${pkg._id}`);
       return pkg;
     }
   }
@@ -94,15 +105,18 @@ function findAvailablePackage(packages) {
     if (!pkg.packageId) continue;
     
     const leadsAssigned = pkg.leadsAssigned || 0;
-    const leadsCount = pkg.packageId.leadsCount || 0;
+    // For packageHistory-based packages, use totalLeads; for PaymentTransaction, use packageId.leadsCount
+    const leadsCount = pkg.totalLeads || pkg.packageId.leadsCount || pkg.packageId?.leadsCount || 0;
     
     // Check if package has remaining capacity
     if (leadsAssigned < leadsCount) {
       // Package has capacity, return it (even if expired - broker gets all paid leads)
+      console.log(`[findAvailablePackage] ✓ Selected regular package ${pkg._id} with capacity ${leadsAssigned}/${leadsCount}`);
       return pkg;
     }
   }
   
+  console.log(`[findAvailablePackage] No available package found`);
   return null;
 }
 
@@ -155,7 +169,8 @@ async function getTotalRemainingLeads(brokerId) {
     if (!pkg.packageId) continue;
     
     const leadsAssigned = pkg.leadsAssigned || 0;
-    const leadsCount = pkg.packageId.leadsCount || 0;
+    // For packageHistory-based packages, use totalLeads; for PaymentTransaction, use packageId.leadsCount
+    const leadsCount = pkg.totalLeads || pkg.packageId.leadsCount || pkg.packageId?.leadsCount || 0;
     const remaining = Math.max(0, leadsCount - leadsAssigned);
     
     totalRemaining += remaining;
@@ -174,6 +189,8 @@ async function getTotalRemainingLeads(brokerId) {
 async function checkPackageCapacity(brokerId, packageRefId) {
   const Broker = require('../models/Broker');
   
+  console.log(`[checkPackageCapacity] Checking capacity for broker ${brokerId}, packageRefId: ${packageRefId}`);
+  
   // Fetch fresh broker data from DB to avoid stale data issues
   const broker = await Broker.findById(brokerId);
   if (!broker || !broker.packageHistory || broker.packageHistory.length === 0) {
@@ -181,23 +198,50 @@ async function checkPackageCapacity(brokerId, packageRefId) {
     return false;
   }
 
+  console.log(`[checkPackageCapacity] Broker has ${broker.packageHistory.length} packageHistory entries:`);
+  broker.packageHistory.forEach((entry, i) => {
+    console.log(`  [${i}] _id: ${entry._id}, transactionId: ${entry.transactionId}, status: ${entry.status}, leadsAssigned: ${entry.leadsAssigned}/${entry.totalLeads}`);
+  });
+
   // Find the specific packageHistory entry using the same matching logic
   let historyEntry = null;
+  const refIdStr = packageRefId?.toString();
   
   // Try to match by packageHistory entry _id (for subscription packages)
   historyEntry = broker.packageHistory.find(
-    entry => entry._id && entry._id.toString() === packageRefId?.toString()
+    entry => entry._id && entry._id.toString() === refIdStr
   );
+  
+  if (historyEntry) {
+    console.log(`[checkPackageCapacity] ✓ Found by _id match`);
+  }
   
   // If not found, try matching by transactionId (for PaymentTransaction packages)
   if (!historyEntry) {
     historyEntry = broker.packageHistory.find(
-      entry => entry.transactionId && entry.transactionId.toString() === packageRefId?.toString()
+      entry => entry.transactionId && entry.transactionId.toString() === refIdStr
     );
+    if (historyEntry) {
+      console.log(`[checkPackageCapacity] ✓ Found by transactionId match`);
+    }
+  }
+  
+  // If still not found, try to find ANY active package with capacity (fallback)
+  if (!historyEntry) {
+    console.log(`[checkPackageCapacity] ✗ No match by _id or transactionId for refId ${refIdStr}`);
+    
+    // Fallback: find any active package with capacity
+    historyEntry = broker.packageHistory.find(
+      entry => entry.status === 'active' && (entry.leadsAssigned || 0) < (entry.totalLeads || 0)
+    );
+    
+    if (historyEntry) {
+      console.log(`[checkPackageCapacity] ⚠ Using fallback - found active package with capacity: ${historyEntry._id}`);
+    }
   }
   
   if (!historyEntry) {
-    console.log(`[checkPackageCapacity] No matching packageHistory entry found for refId ${packageRefId}`);
+    console.log(`[checkPackageCapacity] ❌ No matching packageHistory entry found for refId ${packageRefId}`);
     return false;
   }
   
@@ -206,7 +250,7 @@ async function checkPackageCapacity(brokerId, packageRefId) {
   const totalLeads = historyEntry.totalLeads || 0;
   const hasCapacity = leadsAssigned < totalLeads;
   
-  console.log(`[checkPackageCapacity] Package ${packageRefId}: ${leadsAssigned}/${totalLeads} leads, hasCapacity: ${hasCapacity}`);
+  console.log(`[checkPackageCapacity] Package ${historyEntry._id}: ${leadsAssigned}/${totalLeads} leads, hasCapacity: ${hasCapacity}`);
   
   return hasCapacity;
 }

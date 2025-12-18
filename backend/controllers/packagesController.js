@@ -227,6 +227,11 @@ exports.assignLeadPackageToBroker = async (req, res, next) => {
     }
 
     await broker.save();
+    
+    // Recalculate broker totals after adding new package
+    const { recalculateBrokerTotals } = require('../services/leadAssignmentWatcher');
+    await recalculateBrokerTotals(brokerId);
+    
     await broker.populate('currentPackage');
 
     // 4. Automatically assign open leads after 30 seconds
