@@ -617,6 +617,10 @@ async function handleSubscriptionEvent(body) {
     
     broker.packageHistory.push(packageHistoryEntry);
     await broker.save();
+    
+    // Recalculate broker totals after adding new package
+    const { recalculateBrokerTotals } = require('../services/leadAssignmentWatcher');
+    await recalculateBrokerTotals(broker._id);
 
     console.log(`✓ Subscription package assigned to broker ${broker._id}: ${pkg.name} (monthly subscription)`);
 
